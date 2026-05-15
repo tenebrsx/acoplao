@@ -14,7 +14,7 @@ export default async function LeadsPage() {
     <div className="animate-in delay-100">
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>CRM & Leads</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Manage inbound leads from your marketing site and convert them into active projects.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Manage inbound leads from your marketing site and convert them into active campaigns.</p>
       </div>
 
       <LeadsKanbanClient initialLeads={leads || []} />

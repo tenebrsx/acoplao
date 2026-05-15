@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Send, Loader2, Sparkles, Building2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Send, Loader2, Sparkles, Building2, Save, AlertCircle, RefreshCw } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
 type LineItem = {
@@ -21,7 +21,10 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
   const [items, setItems] = useState<LineItem[]>([
     { id: '1', description: 'Web Application Development', quantity: 1, unit_price: 5000 }
   ])
-  const [saving, setSaving] = useState(false)
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurringInterval, setRecurringInterval] = useState('monthly')
+  const [savingStatus, setSavingStatus] = useState<'draft' | 'sent' | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const addItem = () => {
     setItems([...items, { id: Math.random().toString(), description: '', quantity: 1, unit_price: 0 }])
@@ -37,10 +40,14 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
 
-  const handleCreateInvoice = async () => {
-    if (!businessId) return alert('Please select a business.')
+  const handleCreateInvoice = async (status: 'draft' | 'sent') => {
+    setErrorMsg('')
+    if (!businessId) {
+      setErrorMsg('Please select a business.')
+      return
+    }
     
-    setSaving(true)
+    setSavingStatus(status)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -50,9 +57,11 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
       .insert({
         business_id: businessId,
         amount: subtotal,
-        status: 'draft',
+        status: status,
         due_date: dueDate || null,
         description: description,
+        is_recurring: isRecurring,
+        recurring_interval: isRecurring ? recurringInterval : null,
         created_by: user?.id
       })
       .select()
@@ -60,8 +69,8 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
 
     if (invoiceError || !invoice) {
       console.error(invoiceError)
-      alert('Failed to create invoice')
-      setSaving(false)
+      setErrorMsg('Failed to create invoice. Ensure you have the right permissions.')
+      setSavingStatus(null)
       return
     }
 
@@ -74,30 +83,33 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
         unit_price: item.unit_price
       }))
 
-      await supabase.from('invoice_items').insert(itemsToInsert)
+      const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert)
+      if (itemsError) {
+        console.error(itemsError)
+        setErrorMsg('Failed to save some invoice line items.')
+        setSavingStatus(null)
+        return
+      }
     }
 
-    // Redirect to finances page for now (later we can redirect to a specific invoice view)
     router.push('/dashboard/finances')
   }
 
   return (
-    <div className="animate-in delay-100" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '64px' }}>
+    <div className="animate-in delay-100" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '120px' }}>
       {/* Top Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
         <Link href="/dashboard/finances" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-tertiary)', fontSize: '0.875rem', textDecoration: 'none' }}>
           <ArrowLeft size={16} /> Back to Finances
         </Link>
-        <button 
-          onClick={handleCreateInvoice}
-          disabled={saving || !businessId}
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          Save as Draft
-        </button>
       </div>
+
+      {errorMsg && (
+        <div style={{ marginBottom: '24px', padding: '16px', borderRadius: '8px', backgroundColor: 'var(--error-bg, rgba(255, 0, 0, 0.1))', color: 'var(--error, red)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem' }}>
+          <AlertCircle size={16} />
+          {errorMsg}
+        </div>
+      )}
 
       <div style={{ marginBottom: '40px' }}>
         <h1 style={{ fontSize: '2.5rem', fontWeight: 700, letterSpacing: '-0.02em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -170,6 +182,32 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
               fontSize: '1.25rem', fontWeight: 500
             }}
           />
+        </div>
+
+        {/* Retainer Settings */}
+        <div style={{ marginBottom: '48px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <input type="checkbox" id="recurring" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+             <label htmlFor="recurring" style={{ fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+               <RefreshCw size={14} color="var(--info)" /> Make this a Recurring Retainer
+             </label>
+           </div>
+           
+           {isRecurring && (
+             <select 
+               value={recurringInterval}
+               onChange={(e) => setRecurringInterval(e.target.value)}
+               style={{
+                 padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--surface-border)',
+                 borderRadius: '6px', color: 'var(--text-primary)', outline: 'none', fontSize: '0.875rem'
+               }}
+             >
+               <option value="weekly">Weekly</option>
+               <option value="monthly">Monthly</option>
+               <option value="quarterly">Quarterly</option>
+               <option value="yearly">Yearly</option>
+             </select>
+           )}
         </div>
 
         {/* Line Items */}
@@ -249,6 +287,44 @@ export function InvoiceBuilderClient({ businesses }: { businesses: any[] }) {
           </div>
         </div>
 
+      </div>
+
+      {/* Floating Action Bar */}
+      <div style={{
+        position: 'fixed',
+        bottom: '32px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(10, 10, 10, 0.8)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        padding: '12px 24px',
+        borderRadius: '100px',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+        zIndex: 50
+      }}>
+        <button 
+          onClick={() => handleCreateInvoice('draft')}
+          disabled={savingStatus !== null || !businessId}
+          className="btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '100px', background: 'var(--surface-hover)', border: 'none', color: 'var(--text-primary)' }}
+        >
+          {savingStatus === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Save Draft
+        </button>
+        <button 
+          onClick={() => handleCreateInvoice('sent')}
+          disabled={savingStatus !== null || !businessId}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '100px' }}
+        >
+          {savingStatus === 'sent' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          Finalize & Send
+        </button>
       </div>
     </div>
   )

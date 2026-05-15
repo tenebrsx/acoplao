@@ -3,95 +3,128 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { motion } from 'framer-motion'
-import { FileText, Building2, MoreHorizontal } from 'lucide-react'
+import { FileText, Building2, MoreHorizontal, Trash2, CreditCard, RefreshCw, Clock, CheckCircle2 } from 'lucide-react'
 
 export function ReceivablesKanbanClient({ initialInvoices }: { initialInvoices: any[] }) {
   const [invoices, setInvoices] = useState(initialInvoices)
   const supabase = createClient()
 
   const columns = [
-    { id: 'draft', title: 'Draft' },
-    { id: 'sent', title: 'Sent' },
-    { id: 'overdue', title: 'Overdue' },
-    { id: 'paid', title: 'Paid' }
+    { id: 'draft', title: 'Draft', color: 'var(--text-tertiary)' },
+    { id: 'sent', title: 'Sent', color: 'var(--info)' },
+    { id: 'overdue', title: 'Overdue', color: 'var(--error)' },
+    { id: 'paid', title: 'Paid', color: 'var(--success)' }
   ]
 
   const handleStatusChange = async (invoiceId: string, newStatus: string) => {
-    // Optimistic UI update
     setInvoices(invoices.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus } : inv))
-    
-    // DB update
     await supabase.from('invoices').update({ status: newStatus }).eq('id', invoiceId)
   }
 
+  const handleDelete = async (invoiceId: string) => {
+    if (!confirm('Are you sure you want to delete this invoice?')) return;
+    setInvoices(invoices.filter(inv => inv.id !== invoiceId))
+    await supabase.from('invoices').delete().eq('id', invoiceId)
+  }
+
+  const handleStripeMock = (invoiceId: string) => {
+    alert(`Stripe Integration Flow Activated for invoice ${invoiceId}.`)
+  }
+
   return (
-    <div style={{ marginTop: '32px' }}>
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '24px' }}>Outstanding Receivables Kanban</h2>
+    <div style={{ marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Cashflow Pipeline</h2>
+        <div style={{ padding: '4px 12px', background: 'var(--surface-hover)', borderRadius: '20px', fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+          {invoices.length} Total Invoices
+        </div>
+      </div>
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', overflowX: 'auto', paddingBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '20px', minHeight: '500px' }}>
         {columns.map(col => {
           const columnInvoices = invoices.filter(inv => inv.status === col.id)
           const columnTotal = columnInvoices.reduce((sum, inv) => sum + Number(inv.amount), 0)
 
           return (
-            <div key={col.id} className="glass-panel" style={{ padding: '16px', background: 'var(--surface)', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
+            <div key={col.id} style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
               {/* Column Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--surface-border)' }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
-                  {col.title}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col.color }} />
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                    {col.title}
+                  </span>
                 </div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: col.id === 'paid' ? 'var(--success)' : (col.id === 'overdue' ? 'var(--error)' : 'var(--text-primary)') }}>
-                  ${columnTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  ${columnTotal.toLocaleString()}
                 </div>
               </div>
 
-              {/* Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+              {/* Cards Container */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '16px', border: '1px solid var(--surface-border)', flex: 1 }}>
                 {columnInvoices.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8125rem', marginTop: '24px' }}>No invoices</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.75rem', marginTop: '32px', border: '1px dashed var(--surface-border)', borderRadius: '12px', padding: '24px' }}>
+                    Empty
+                  </div>
                 ) : (
                   columnInvoices.map(inv => (
                     <motion.div 
                       layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       key={inv.id} 
-                      className="glass-panel hover-card-biz"
-                      style={{ padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', cursor: 'grab' }}
+                      className="glass-panel"
+                      style={{ padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', cursor: 'default' }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9375rem' }}>
-                          <FileText size={14} color="var(--accent-primary)" />
-                          ${Number(inv.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <div>
+                           <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                             ${Number(inv.amount).toLocaleString()}
+                           </div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                              <Building2 size={12} />
+                              <span style={{ fontWeight: 500 }}>{inv.businesses?.name || 'Client'}</span>
+                           </div>
                         </div>
                         <div style={{ position: 'relative' }}>
                            <select 
                              value={inv.status}
                              onChange={(e) => handleStatusChange(inv.id, e.target.value)}
                              style={{ 
-                               position: 'absolute', opacity: 0, width: '20px', height: '20px', 
+                               position: 'absolute', opacity: 0, width: '24px', height: '24px', 
                                right: 0, top: 0, cursor: 'pointer' 
                              }}
                            >
-                             <option value="draft">Draft</option>
-                             <option value="sent">Sent</option>
-                             <option value="overdue">Overdue</option>
-                             <option value="paid">Paid</option>
+                             <option value="draft">Move to Draft</option>
+                             <option value="sent">Move to Sent</option>
+                             <option value="overdue">Move to Overdue</option>
+                             <option value="paid">Mark as Paid</option>
                            </select>
-                           <MoreHorizontal size={16} color="var(--text-tertiary)" />
+                           <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                             <MoreHorizontal size={14} color="var(--text-secondary)" />
+                           </div>
                         </div>
                       </div>
+
+                      {inv.is_recurring && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 700, color: 'var(--info)', background: 'rgba(0,150,255,0.1)', padding: '2px 8px', borderRadius: '4px', marginBottom: '12px', width: 'fit-content', textTransform: 'uppercase' }}>
+                          <RefreshCw size={10} /> {inv.recurring_interval} Retainer
+                        </div>
+                      )}
                       
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                        <Building2 size={12} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {inv.businesses?.name || 'Unknown Business'}
-                        </span>
-                      </div>
-                      
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                        Due: {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'N/A'}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: 'var(--text-tertiary)', borderTop: '1px solid var(--surface-border)', paddingTop: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={10} />
+                          {inv.status === 'paid' ? 'Paid on time' : `Due ${new Date(inv.due_date).toLocaleDateString()}`}
+                        </div>
+                        {inv.status === 'paid' ? (
+                          <CheckCircle2 size={12} color="var(--success)" />
+                        ) : (
+                          <button onClick={() => handleStripeMock(inv.id)} style={{ color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CreditCard size={12} /> Pay
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   ))

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/utils/supabase/client'
-import { Shield, ShieldAlert, Power, Loader2, Activity, Zap } from 'lucide-react'
+import { Shield, ShieldAlert, Power, Loader2, Activity, Zap, Plus } from 'lucide-react'
 
 type Profile = {
   id: string
@@ -20,6 +20,11 @@ export function ContractorTable() {
   
   // Local state for instant realtime updates on top of React Query
   const [realtimeProfiles, setRealtimeProfiles] = useState<Profile[]>([])
+  
+  // Invite Link State
+  const [selectedInviteRole, setSelectedInviteRole] = useState('contractor')
+  const [generatedInviteLink, setGeneratedInviteLink] = useState('')
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
 
   // 1. Fetch Contractors (All profiles)
   const { data: initialContractors, isLoading } = useQuery({
@@ -109,27 +114,89 @@ export function ContractorTable() {
     return Math.abs(hash) % 100;
   }
 
+  // Generate a role-specific invite link
+  const generateInviteLink = async () => {
+    setIsGeneratingLink(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      setIsGeneratingLink(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('role_invites')
+      .insert({ role: selectedInviteRole, created_by: user.id })
+      .select('id')
+      .single()
+
+    if (!error && data) {
+      // Use window.location.origin so it works correctly on localhost and prod
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aura.agency'
+      setGeneratedInviteLink(`${baseUrl}/join?token=${data.id}&role=${selectedInviteRole}`)
+    } else {
+      alert("Failed to generate link. Have you pushed the migrations?")
+    }
+    setIsGeneratingLink(false)
+  }
+
   return (
     <div>
       {/* Invite Section */}
-      <div className="glass-panel" style={{ padding: '24px', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--accent-primary)', boxShadow: '0 8px 32px rgba(0,225,255,0.05)' }}>
-        <div>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Zap size={18} color="var(--accent-primary)" /> Expand the Agency
-          </h3>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>Share this magic link. New users instantly join as Contractors and appear below in real-time.</p>
+      <div className="glass-panel" style={{ padding: '24px', marginBottom: '32px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid var(--accent-primary)', boxShadow: '0 8px 32px rgba(0,225,255,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={18} color="var(--accent-primary)" /> Expand the Agency
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>Generate a role-specific magic link. When the user signs up, they will automatically be assigned the selected role.</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', padding: '6px 6px 6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--surface-border)' }}>
-          <code style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>https://aura.agency/join</code>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-primary)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Invite as:</span>
+            <select 
+              value={selectedInviteRole} 
+              onChange={e => {
+                setSelectedInviteRole(e.target.value)
+                setGeneratedInviteLink('') // Reset link when role changes
+              }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', fontSize: '0.875rem', padding: '6px 12px', borderRadius: '8px', outline: 'none' }}
+            >
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="contractor">Contractor</option>
+              <option value="client">Client</option>
+            </select>
+          </div>
+
           <button 
-            onClick={() => {
-              navigator.clipboard.writeText('https://aura.agency/join')
-              alert('Copied to clipboard!')
-            }}
-            className="btn btn-primary" style={{ borderRadius: 'var(--radius-full)', padding: '6px 16px', fontSize: '0.8125rem' }}
+            onClick={generateInviteLink}
+            disabled={isGeneratingLink}
+            className="btn btn-secondary" 
+            style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            Copy Link
+            {isGeneratingLink ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Generate Link
           </button>
+
+          {generatedInviteLink && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+              <code style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'rgba(0, 225, 255, 0.1)', padding: '4px 8px', borderRadius: '6px' }}>
+                {generatedInviteLink.substring(0, 40)}...
+              </code>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedInviteLink)
+                  alert(`Copied ${selectedInviteRole} invite link to clipboard!`)
+                }}
+                className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '0.8125rem' }}
+              >
+                Copy Link
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

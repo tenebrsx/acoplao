@@ -16,7 +16,7 @@ export default async function CapacityPage() {
     .from('deliverables')
     .select(`
       id, title, status_v2, projects(title),
-      deliverable_phases(id, name, status, assigned_to, start_date, due_date)
+      deliverable_phases(id, phase_name, is_completed, scheduled_date, assigned_to, start_date, due_date)
     `)
     .neq('status_v2', 'approved')
 

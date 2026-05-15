@@ -1,10 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { DollarSign, TrendingUp, TrendingDown, ArrowRight, Wallet, Receipt, CreditCard, Activity } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, ArrowRight, Wallet, Receipt, CreditCard, Activity, CalendarClock, Zap, Target, PieChart, Landmark } from 'lucide-react'
 import { ReceivablesKanbanClient } from './ReceivablesKanbanClient'
+import { ProfitEngineChart } from './ProfitEngineChart'
 
 import { ExportDataClient } from './ExportDataClient'
+import { ExpenseListClient } from './ExpenseListClient'
 
 export default async function FinancesDashboard() {
   const supabase = await createClient()
@@ -19,12 +21,11 @@ export default async function FinancesDashboard() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard') // Only admins should see global finances
+  if (profile?.role !== 'admin' && profile?.role !== 'manager') {
+    redirect('/dashboard')
   }
 
   // --- Fetch Financial Data ---
-  // 1. Invoices (Income)
   const { data: invoicesWithBusinesses } = await supabase
     .from('invoices')
     .select('*, businesses(name)')
@@ -39,15 +40,14 @@ export default async function FinancesDashboard() {
     .filter(inv => inv.status !== 'paid')
     .reduce((sum, inv) => sum + Number(inv.amount), 0)
 
-  // 2. Expenses (Fixed/Software/Ad Spend)
   const { data: expenses } = await supabase
     .from('expenses')
-    .select('amount, category')
+    .select('id, amount, category, description, expense_date, receipt_url, businesses(name)')
+    .order('expense_date', { ascending: false })
 
   const fixedExpenses = (expenses || [])
     .reduce((sum, exp) => sum + Number(exp.amount), 0)
 
-  // 3. Timesheets (Contractor Costs)
   const { data: timesheets } = await supabase
     .from('contractor_timesheets')
     .select('hours_logged, hourly_rate')
@@ -59,123 +59,153 @@ export default async function FinancesDashboard() {
   const netProfit = totalIncome - totalExpenses
   const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0'
 
+  const averageMonthlyExpenses = totalExpenses / 12 || 1
+  const forecast30Days = outstandingReceivables - averageMonthlyExpenses
+
   return (
     <div className="animate-in delay-100">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Wallet size={28} color="var(--accent-primary)" /> Global Finances
-          </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Agency-wide accounting, profit margins, and cashflow pipeline.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Link href="/dashboard/finances/invoices/new" className="btn btn-secondary">
-            <Receipt size={16} /> New Invoice
-          </Link>
-          <Link href="/dashboard/finances/expenses/new" className="btn btn-primary">
-            <CreditCard size={16} /> Log Expense
-          </Link>
+      
+      {/* Executive Financial Header */}
+      <div style={{ position: 'relative', height: '200px', borderRadius: '16px', marginBottom: '32px', overflow: 'hidden', border: '1px solid var(--surface-border)' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(0, 225, 255, 0.1) 100%)', zIndex: 0 }} />
+        <div style={{ position: 'absolute', inset: 0, padding: '40px 32px', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '16px', letterSpacing: '-0.02em' }}>
+              <Landmark size={32} color="var(--success)" /> Financial Command
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
+              Monitor agency-wide profitability, cashflow velocity, and tax-ready accounting.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Link href="/dashboard/finances/invoices/new" className="btn btn-secondary" style={{ background: 'rgba(0,0,0,0.4)', borderColor: 'var(--surface-border)' }}>
+              <Receipt size={18} /> New Invoice
+            </Link>
+            <Link href="/dashboard/finances/expenses/new" className="btn btn-primary" style={{ boxShadow: '0 4px 15px rgba(0,225,255,0.2)' }}>
+              <CreditCard size={18} /> Log Expense
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Hero Metrics */}
-      <div className="grid grid-cols-4" style={{ marginBottom: '32px' }}>
-        <div className="metric-card hover-card-biz">
-          <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <TrendingUp size={14} color="var(--success)" /> Gross Revenue
+      {/* Financial Pulse Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <TrendingUp size={12} color="var(--success)" /> Gross Revenue
           </div>
-          <div className="metric-value">${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
         </div>
         
-        <div className="metric-card hover-card-biz">
-          <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <TrendingDown size={14} color="var(--error)" /> Total Expenses
+        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <TrendingDown size={12} color="var(--error)" /> Burn Rate
           </div>
-          <div className="metric-value">${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
         </div>
 
-        <div className="metric-card hover-card-biz">
-          <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Activity size={14} color="var(--info)" /> Net Profit Margin
+        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={12} color="var(--info)" /> Net Margin
           </div>
-          <div className="metric-value" style={{ color: Number(profitMargin) >= 20 ? 'var(--success)' : 'var(--text-primary)' }}>
-            {profitMargin}%
-          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: Number(profitMargin) >= 20 ? 'var(--success)' : 'var(--text-primary)' }}>{profitMargin}%</div>
         </div>
 
-        <div className="metric-card hover-card-biz">
-          <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <DollarSign size={14} color="var(--warning)" /> Outstanding Receivables
+        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <DollarSign size={12} color="var(--warning)" /> Receivables
           </div>
-          <div className="metric-value">${outstandingReceivables.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${outstandingReceivables.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
+        </div>
+
+        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Zap size={12} color="var(--accent-primary)" /> Forecast
+          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: forecast30Days >= 0 ? 'var(--success)' : 'var(--error)' }}>
+            ${forecast30Days.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+          </div>
         </div>
       </div>
 
-      {/* Main Breakdown */}
-      <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      {/* Main Financial Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
         
-        {/* Left Column: Recent Activity / Charts */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px' }}>The Profit Engine</h2>
+        {/* Left Column: Flow & Activity */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          <div style={{ padding: '24px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', height: '200px', paddingBottom: '16px', borderBottom: '1px solid var(--surface-border)' }}>
-              {/* Mock Profit Engine Chart for visual perfection */}
-              {[40, 65, 45, 80, 55, 90, 75, 100].map((h, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '4px', height: '100%' }}>
-                  <div style={{ width: '100%', height: `${h}%`, background: 'var(--accent-primary)', borderRadius: '4px', opacity: 0.8, transition: 'opacity 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.opacity = '1'} onMouseOut={e => e.currentTarget.style.opacity = '0.8'} />
-                  <div style={{ width: '100%', height: `${h * 0.7}%`, background: 'var(--info)', borderRadius: '4px', opacity: 0.8, transition: 'opacity 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.opacity = '1'} onMouseOut={e => e.currentTarget.style.opacity = '0.8'} />
+          {/* Chart Area */}
+          <div className="glass-panel" style={{ padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <PieChart size={18} color="var(--accent-primary)" /> Profit Engine
+              </h2>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', gap: '16px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }} /> Revenue</div>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--error)' }} /> Expenses</div>
+              </div>
+            </div>
+            <ProfitEngineChart />
+          </div>
+
+          {/* Receivables Kanban Integrated */}
+          <ReceivablesKanbanClient initialInvoices={invoicesWithBusinesses || []} />
+
+          <ExpenseListClient initialExpenses={expenses || []} />
+        </div>
+
+        {/* Right Column: Breakdown & Controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'sticky', top: '24px' }}>
+          
+          {/* Category Breakdown */}
+          <div className="glass-panel" style={{ padding: '28px' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '24px' }}>Burn Composition</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>External Contractors</span>
+                  <span style={{ fontWeight: 600 }}>${contractorCosts.toLocaleString()}</span>
                 </div>
-              ))}
+                <div style={{ height: '8px', background: 'var(--surface-border)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: totalExpenses > 0 ? `${(contractorCosts / totalExpenses) * 100}%` : '0%', background: 'var(--info)', borderRadius: '4px' }} />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tools & Overhead</span>
+                  <span style={{ fontWeight: 600 }}>${fixedExpenses.toLocaleString()}</span>
+                </div>
+                <div style={{ height: '8px', background: 'var(--surface-border)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: totalExpenses > 0 ? `${(fixedExpenses / totalExpenses) * 100}%` : '0%', background: 'var(--warning)', borderRadius: '4px' }} />
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '16px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--accent-primary)' }}/> Gross Revenue</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--info)' }}/> Net Profit</span>
+            
+            <div style={{ marginTop: '32px', padding: '20px', background: 'rgba(0, 225, 255, 0.03)', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Target size={16} color="var(--accent-primary)" />
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Profit Goal</span>
+              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0' }}>
+                Targeting a <strong style={{ color: 'var(--text-primary)' }}>35% margin</strong>. You are currently at <strong style={{ color: Number(profitMargin) >= 35 ? 'var(--success)' : 'var(--warning)' }}>{profitMargin}%</strong>.
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Right Column: Expense Breakdown */}
-        <div className="glass-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '20px' }}>Expense Breakdown</h2>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Contractor Timesheets</span>
-                <span style={{ fontWeight: 500 }}>${contractorCosts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div style={{ height: '6px', background: 'var(--surface-border)', borderRadius: '3px' }}>
-                <div style={{ height: '100%', width: totalExpenses > 0 ? `${(contractorCosts / totalExpenses) * 100}%` : '0%', background: 'var(--info)', borderRadius: '3px' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Software & Fixed</span>
-                <span style={{ fontWeight: 500 }}>${fixedExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div style={{ height: '6px', background: 'var(--surface-border)', borderRadius: '3px' }}>
-                <div style={{ height: '100%', width: totalExpenses > 0 ? `${(fixedExpenses / totalExpenses) * 100}%` : '0%', background: 'var(--warning)', borderRadius: '3px' }} />
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ marginTop: '32px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--surface-border)' }}>
-            <h3 style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Executive Reporting</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginBottom: '16px', lineHeight: 1.5 }}>
-              Download a perfectly formatted CSV of all income and expenses for your accountant or tax records.
+          {/* Export & Actions */}
+          <div className="glass-panel" style={{ padding: '28px' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>Accounting Tools</h2>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Export financial records for your tax preparation or internal auditing.
             </p>
             <ExportDataClient invoices={invoices} expenses={expenses || []} />
           </div>
+
         </div>
 
       </div>
-
-      {/* Receivables Kanban */}
-      <ReceivablesKanbanClient initialInvoices={invoicesWithBusinesses || []} />
     </div>
   )
 }

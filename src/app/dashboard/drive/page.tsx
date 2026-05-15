@@ -1,15 +1,25 @@
 import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
 import { DriveClient } from './DriveClient'
-import { FolderUp, HardDrive } from 'lucide-react'
+import { HardDrive } from 'lucide-react'
 
 export default async function DrivePage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch recent digital assets
-  const { data: assets } = await supabase
-    .from('digital_assets')
-    .select('*, projects(title), businesses(name), profiles(email)')
+  if (!user) redirect('/login')
+
+  // Fetch all drive files with relations
+  const { data: files } = await supabase
+    .from('drive_files')
+    .select('*, projects(id, title), businesses(id, name), profiles(email)')
     .order('created_at', { ascending: false })
+
+  // Fetch businesses and projects for the filter dropdowns
+  const [businessesRes, projectsRes] = await Promise.all([
+    supabase.from('businesses').select('id, name'),
+    supabase.from('projects').select('id, title, business_id')
+  ])
 
   return (
     <div className="animate-in delay-100">
@@ -22,7 +32,12 @@ export default async function DrivePage() {
         </div>
       </div>
 
-      <DriveClient initialAssets={assets || []} />
+      <DriveClient 
+        initialFiles={files || []} 
+        businesses={businessesRes.data || []}
+        projects={projectsRes.data || []}
+        userId={user.id}
+      />
     </div>
   )
 }

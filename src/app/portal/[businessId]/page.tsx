@@ -36,7 +36,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ b
     .from('businesses')
     .select(`
       id, name, contact_name, contact_email, brand_colors, brand_typography, brand_tone_of_voice, brand_strategy_url,
-      projects(id, title, status, deliverables(id, title, status_v2, published_url, publish_date))
+      projects(id, title, status, deliverables(id, title, status_v2, published_url, publish_date, deliverable_phases(is_completed)))
     `)
     .eq('id', businessId)
     .single()

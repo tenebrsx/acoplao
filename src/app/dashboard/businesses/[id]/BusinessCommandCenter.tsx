@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Copy, CheckCircle2, Circle, Upload, DollarSign, Calendar, ExternalLink, Globe, FileText, FolderKanban, X, Plus, Trash2, Save, LayoutTemplate, ListTodo, FilePlus, Milestone } from 'lucide-react'
+import { Copy, CheckCircle2, Circle, Upload, DollarSign, Calendar, ExternalLink, Globe, FileText, FolderKanban, X, Plus, Trash2, Save, LayoutTemplate, ListTodo, FilePlus, Milestone, Clock } from 'lucide-react'
 
-export function BusinessCommandCenter({ business, invoices, expenses, todos, assets }: { business: any, invoices: any[], expenses: any[], todos: any[], assets: any[] }) {
+import { BusinessCalendarClient } from './BusinessCalendarClient'
+
+export function BusinessCommandCenter({ business, invoices, expenses, todos, assets, events = [] }: { business: any, invoices: any[], expenses: any[], todos: any[], assets: any[], events?: any[] }) {
   const router = useRouter()
   const supabase = createClient()
   
@@ -54,6 +56,46 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
   const timelineDeliverables = allDeliverables
     .filter((d: any) => d.publish_date)
     .sort((a: any, b: any) => new Date(a.publish_date).getTime() - new Date(b.publish_date).getTime())
+
+  // Business Schedule (Unified Contextual Calendar)
+  const scheduleItems: {id: string, title: string, subtitle: string, date: Date, color: string, icon: any}[] = []
+  
+  timelineDeliverables.forEach((d: any) => {
+    scheduleItems.push({
+      id: `deliv-${d.id}`, title: `Publish: ${d.title}`, subtitle: d.projectTitle,
+      date: new Date(d.publish_date), color: 'var(--accent-primary)', icon: FolderKanban
+    })
+  })
+
+  events.forEach(e => {
+    scheduleItems.push({
+      id: `event-${e.id}`, title: e.title, subtitle: 'Event',
+      date: new Date(e.start_time), color: e.color || 'var(--accent-secondary)', icon: Calendar
+    })
+  })
+
+  todos.forEach(t => {
+    if (t.due_date && !t.is_completed) {
+      scheduleItems.push({
+        id: `todo-${t.id}`, title: t.title, subtitle: 'Task',
+        date: new Date(t.due_date), color: 'var(--info)', icon: CheckCircle2
+      })
+    }
+  })
+
+  invoices.forEach(i => {
+    if (i.due_date && i.status !== 'paid') {
+      scheduleItems.push({
+        id: `inv-${i.id}`, title: `Invoice Due: $${i.amount}`, subtitle: i.description || 'Payment',
+        date: new Date(i.due_date), color: 'var(--warning)', icon: DollarSign
+      })
+    }
+  })
+
+  const upcomingSchedule = scheduleItems
+    .filter(item => item.date >= new Date(new Date().setHours(0,0,0,0)))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 5)
 
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
@@ -238,7 +280,7 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
               <FileText size={16} /> {business.contact_name} ({business.contact_email})
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <FolderKanban size={16} /> {business.projects?.length || 0} Active Projects
+              <FolderKanban size={16} /> {business.projects?.length || 0} Active Campaigns
             </span>
           </div>
         </div>
@@ -275,14 +317,14 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Calendar size={20} color="var(--accent-primary)" /> Deliverables & Publishing Hub
+                  <Calendar size={20} color="var(--accent-primary)" /> Campaigns & Content Hub
                 </h2>
                 <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                   Upload finals and push to portal
                 </div>
               </div>
               <button onClick={() => setIsCreatingProject(true)} className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={14} /> New Project
+                <Plus size={14} /> New Campaign
               </button>
             </div>
 
@@ -336,7 +378,7 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
 
             {allDeliverables.length === 0 ? (
               <div style={{ padding: '48px', textAlign: 'center', border: '1px dashed var(--surface-border)', borderRadius: '12px', color: 'var(--text-tertiary)' }}>
-                No deliverables currently active. Create a project to begin.
+                No active campaigns found. Create a campaign to begin.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -382,12 +424,22 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
                 ))}
               </div>
             )}
+
           </div>
         </div>
 
         {/* Right Column: Mini Dashboard */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
+          {/* Business Upcoming Schedule */}
+          <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={18} color="var(--accent-primary)" /> Team Schedule
+            </h2>
+
+            <BusinessCalendarClient businessId={business.id} scheduleItems={scheduleItems} />
+          </div>
+
           {/* Account Manager To-Do List */}
           <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px' }}>
             <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -483,7 +535,7 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setIsCreatingProject(false)} />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="glass-panel" style={{ position: 'relative', width: '100%', maxWidth: '600px', padding: '32px', borderRadius: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Create New Project</h2>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Create New Campaign</h2>
                 <button onClick={() => setIsCreatingProject(false)} style={{ background: 'var(--surface)', border: 'none', padding: '8px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
               </div>
 
@@ -497,7 +549,7 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
                     <LayoutTemplate size={18} color="var(--info)" /> Monthly Content Retainer
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Auto-generates 4 weekly short-form video deliverables.</div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Auto-generates 4 weekly short-form video assets.</div>
                 </button>
 
                 <button 
@@ -518,8 +570,8 @@ export function BusinessCommandCenter({ business, invoices, expenses, todos, ass
                   disabled={saving}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '24px', background: 'var(--bg-primary)', border: '1px dashed var(--surface-border)', borderRadius: '12px', textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.2s' }}
                 >
-                  <div style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Blank Project</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Start from scratch. No deliverables pre-loaded.</div>
+                  <div style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Blank Campaign</div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Start from scratch. No content pieces pre-loaded.</div>
                 </button>
               </div>
 

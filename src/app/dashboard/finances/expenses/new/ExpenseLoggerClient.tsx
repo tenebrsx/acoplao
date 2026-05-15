@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Loader2, Sparkles, Building2, Image as ImageIcon, Code, Briefcase, Hash, CreditCard } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, Sparkles, Building2, Image as ImageIcon, Code, Briefcase, Hash, CreditCard, AlertCircle, UploadCloud, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
 export function ExpenseLoggerClient({ businesses }: { businesses: any[] }) {
@@ -15,16 +15,54 @@ export function ExpenseLoggerClient({ businesses }: { businesses: any[] }) {
   const [category, setCategory] = useState<'software' | 'contractor' | 'ad_spend' | 'other'>('software')
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0])
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectedBusiness = businesses.find(b => b.id === businessId)
   const availableProjects = selectedBusiness?.projects || []
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setReceiptFile(e.target.files[0])
+    }
+  }
+
   const handleLogExpense = async () => {
-    if (!amount || isNaN(Number(amount))) return alert('Please enter a valid amount.')
+    setErrorMsg('')
+    if (!amount || isNaN(Number(amount))) {
+      setErrorMsg('Please enter a valid amount.')
+      return
+    }
     
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+
+    let receipt_url = null
+    if (receiptFile) {
+      setUploadingReceipt(true)
+      const fileExt = receiptFile.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `${user?.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(filePath, receiptFile)
+
+      if (uploadError) {
+        console.error(uploadError)
+        setErrorMsg('Failed to upload receipt.')
+        setSaving(false)
+        setUploadingReceipt(false)
+        return
+      }
+      
+      const { data } = supabase.storage.from('receipts').getPublicUrl(filePath)
+      receipt_url = data.publicUrl
+      setUploadingReceipt(false)
+    }
 
     const { error } = await supabase
       .from('expenses')
@@ -35,12 +73,13 @@ export function ExpenseLoggerClient({ businesses }: { businesses: any[] }) {
         amount: Number(amount),
         expense_date: expenseDate,
         description: description,
+        receipt_url: receipt_url,
         created_by: user?.id
       })
 
     if (error) {
       console.error(error)
-      alert('Failed to log expense')
+      setErrorMsg('Failed to log expense. You may not have permission, or there was a server error.')
       setSaving(false)
       return
     }
@@ -58,22 +97,20 @@ export function ExpenseLoggerClient({ businesses }: { businesses: any[] }) {
   }
 
   return (
-    <div className="animate-in delay-100" style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '64px' }}>
+    <div className="animate-in delay-100" style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '120px' }}>
       {/* Top Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
         <Link href="/dashboard/finances" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-tertiary)', fontSize: '0.875rem', textDecoration: 'none' }}>
-          <ArrowLeft size={16} /> Cancel
+          <ArrowLeft size={16} /> Back to Finances
         </Link>
-        <button 
-          onClick={handleLogExpense}
-          disabled={saving || !amount}
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          Log Expense
-        </button>
       </div>
+
+      {errorMsg && (
+        <div style={{ marginBottom: '24px', padding: '16px', borderRadius: '8px', backgroundColor: 'var(--error-bg, rgba(255, 0, 0, 0.1))', color: 'var(--error, red)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem' }}>
+          <AlertCircle size={16} />
+          {errorMsg}
+        </div>
+      )}
 
       {/* Main Expense Panel */}
       <div className="glass-panel" style={{ padding: '48px', background: 'var(--surface)', position: 'relative', overflow: 'hidden' }}>
@@ -196,19 +233,56 @@ export function ExpenseLoggerClient({ businesses }: { businesses: any[] }) {
           {/* Receipt Upload Placeholder */}
           <div>
              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Receipt</label>
-             <div style={{ 
-               width: '100%', padding: '32px', border: '1px dashed var(--surface-border)', 
-               borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', 
-               justifyContent: 'center', gap: '12px', cursor: 'pointer', background: 'var(--bg-primary)'
-             }}>
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*,.pdf" />
+             <div 
+               onClick={() => fileInputRef.current?.click()}
+               style={{ 
+                 width: '100%', padding: '32px', border: receiptFile ? '1px solid var(--accent-primary)' : '1px dashed var(--surface-border)', 
+                 borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', 
+                 justifyContent: 'center', gap: '12px', cursor: 'pointer', background: receiptFile ? 'var(--surface-hover)' : 'var(--bg-primary)'
+               }}>
                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <ImageIcon size={18} color="var(--text-secondary)" />
+                 {receiptFile ? <CheckCircle2 size={18} color="var(--success)" /> : <UploadCloud size={18} color="var(--text-secondary)" />}
                </div>
-               <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Click or drag receipt to attach</div>
+               <div style={{ fontSize: '0.875rem', color: receiptFile ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                 {receiptFile ? receiptFile.name : 'Click to attach receipt'}
+               </div>
              </div>
           </div>
 
         </div>
+      </div>
+
+      {/* Floating Action Bar */}
+      <div style={{
+        position: 'fixed',
+        bottom: '32px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(10, 10, 10, 0.8)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        padding: '12px 24px',
+        borderRadius: '100px',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+        zIndex: 50
+      }}>
+        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          {uploadingReceipt ? 'Uploading receipt...' : 'Ready to log?'}
+        </span>
+        <button 
+          onClick={handleLogExpense}
+          disabled={saving || !amount}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '100px' }}
+        >
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+          Log Expense
+        </button>
       </div>
     </div>
   )

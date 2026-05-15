@@ -184,7 +184,7 @@ export function CapacityGanttClient({ team, activeDeliverables }: { team: any[],
                   const position = getPositionStyles(phase.startDate, phase.dueDate)
                   if (position.display === 'none') return null
 
-                  const isDone = phase.status === 'completed'
+                  const isDone = phase.is_completed === true
                   
                   return (
                     <div key={phase.id} style={{ 
@@ -210,10 +210,10 @@ export function CapacityGanttClient({ team, activeDeliverables }: { team: any[],
                         textOverflow: 'ellipsis',
                         cursor: 'pointer',
                         boxShadow: isDone ? 'none' : '0 4px 12px rgba(0, 225, 255, 0.2)'
-                      }} title={`${phase.projectName} - ${phase.deliverableName} (${phase.name})`}>
+                      }} title={`${phase.projectName} - ${phase.deliverableName} (${phase.phase_name})`}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           <span style={{ opacity: 0.7, marginRight: '6px' }}>{phase.deliverableName}</span>
-                          {phase.name}
+                          {phase.phase_name}
                         </div>
                       </div>
                     </div>

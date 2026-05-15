@@ -19,9 +19,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Mail, Phone, DollarSign, Building, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Mail, Phone, DollarSign, Building, Sparkles, CheckCircle2, X, Calendar, MessageSquare } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // --- Types ---
 type Lead = {
@@ -36,6 +37,10 @@ type Lead = {
   status: 'new' | 'contacted' | 'proposal_sent' | 'won' | 'lost'
   converted_business_id?: string
   created_at: string
+  lead_source?: string
+  estimated_close_date?: string
+  priority?: string
+  follow_up_date?: string
 }
 
 const COLUMNS = [
@@ -47,7 +52,7 @@ const COLUMNS = [
 ]
 
 // --- Lead Card Component ---
-function LeadCard({ lead, isOverlay, onConvert }: { lead: Lead, isOverlay?: boolean, onConvert: (id: string) => void }) {
+function LeadCard({ lead, isOverlay, onClick, onConvert }: { lead: Lead, isOverlay?: boolean, onClick?: (lead: Lead) => void, onConvert?: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id, data: { type: 'Lead', lead } })
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -57,18 +62,34 @@ function LeadCard({ lead, isOverlay, onConvert }: { lead: Lead, isOverlay?: bool
     cursor: isOverlay ? 'grabbing' : 'grab',
   }
 
+  const priorityColor = lead.priority === 'high' ? 'var(--error)' : lead.priority === 'low' ? 'var(--info)' : 'var(--warning)'
+
   return (
-    <div ref={setNodeRef} style={{ ...style, padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: '12px' }} {...attributes} {...listeners} className="glass-panel">
-      <div>
-        <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{lead.company_name}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-          <Building size={12} /> {lead.contact_name}
+    <div 
+      ref={setNodeRef} 
+      style={{ ...style, padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: '12px' }} 
+      {...attributes} 
+      {...listeners} 
+      className="glass-panel"
+      onClick={(e) => {
+        // Prevent opening drawer if dragging
+        if (!isDragging && onClick) onClick(lead)
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{lead.company_name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+            <Building size={12} /> {lead.contact_name}
+          </div>
         </div>
+        {lead.priority && (
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: priorityColor }} title={`Priority: ${lead.priority}`} />
+        )}
       </div>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={12} /> {lead.email}</div>
-        {lead.phone && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={12} /> {lead.phone}</div>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--surface-border)' }}>
@@ -85,16 +106,10 @@ function LeadCard({ lead, isOverlay, onConvert }: { lead: Lead, isOverlay?: bool
         )}
       </div>
 
-      {lead.message && (
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '8px', background: 'var(--surface)', borderRadius: '6px', borderLeft: '2px solid var(--accent-primary)', marginTop: '4px', fontStyle: 'italic', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          "{lead.message}"
-        </div>
-      )}
-
-      {lead.status === 'won' && !lead.converted_business_id && (
+      {lead.status === 'won' && !lead.converted_business_id && onConvert && (
         <button 
           onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
-          onClick={() => onConvert(lead.id)}
+          onClick={(e) => { e.stopPropagation(); onConvert(lead.id); }}
           style={{ width: '100%', padding: '10px', marginTop: '8px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
           <Sparkles size={14} /> Convert to Project
@@ -111,7 +126,7 @@ function LeadCard({ lead, isOverlay, onConvert }: { lead: Lead, isOverlay?: bool
 }
 
 // --- Column Component ---
-function Column({ id, title, color, leads, onConvert }: { id: string; title: string; color: string; leads: Lead[], onConvert: (id: string) => void }) {
+function Column({ id, title, color, leads, onConvert, onLeadClick }: { id: string; title: string; color: string; leads: Lead[], onConvert: (id: string) => void, onLeadClick: (lead: Lead) => void }) {
   const { setNodeRef } = useSortable({ id, data: { type: 'Column', colId: id } })
 
   return (
@@ -126,7 +141,7 @@ function Column({ id, title, color, leads, onConvert }: { id: string; title: str
       
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'rgba(0, 0, 0, 0.1)' }}>
         <SortableContext items={leads.map(l => l.id)}>
-          {leads.map(lead => <LeadCard key={lead.id} lead={lead} onConvert={onConvert} />)}
+          {leads.map(lead => <LeadCard key={lead.id} lead={lead} onClick={onLeadClick} onConvert={onConvert} />)}
         </SortableContext>
         {leads.length === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', border: '1px dashed var(--surface-border)', borderRadius: '8px', color: 'var(--text-tertiary)', fontSize: '0.8125rem' }}>
@@ -143,6 +158,8 @@ export function LeadsKanbanClient({ initialLeads }: { initialLeads: Lead[] }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isConverting, setIsConverting] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  
   const supabase = createClient()
   const router = useRouter()
 
@@ -167,8 +184,11 @@ export function LeadsKanbanClient({ initialLeads }: { initialLeads: Lead[] }) {
             })
           } else if (payload.eventType === 'UPDATE') {
             setLeads((current) => current.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l))
+            // Update selected lead if it's the one being edited
+            setSelectedLead(current => current?.id === payload.new.id ? { ...current, ...payload.new } : current)
           } else if (payload.eventType === 'DELETE') {
             setLeads((current) => current.filter(l => l.id !== payload.old.id))
+            setSelectedLead(current => current?.id === payload.old.id ? null : current)
           }
         }
       )
@@ -263,11 +283,15 @@ export function LeadsKanbanClient({ initialLeads }: { initialLeads: Lead[] }) {
     const leadId = active.id
     const newStatus = active.data.current?.lead?.status
 
-    // Optimistic UI update already happened in dragOver, but we need the final status
     const finalLead = leads.find(l => l.id === leadId)
     if (finalLead) {
-      // Background save to Supabase
       await supabase.from('leads').update({ status: finalLead.status }).eq('id', leadId)
+      // Log activity
+      await supabase.from('lead_activities').insert({
+        lead_id: leadId,
+        activity_type: 'status_change',
+        content: `Moved to ${finalLead.status}`
+      })
     }
   }
 
@@ -300,31 +324,161 @@ export function LeadsKanbanClient({ initialLeads }: { initialLeads: Lead[] }) {
     }
   }
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
-        <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={16} /> Add Lead Manually
-        </button>
-      </div>
-      <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '24px', alignItems: 'flex-start' }}>
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-          {COLUMNS.map(col => (
-            <Column 
-              key={col.id} 
-              id={col.id} 
-              title={col.title} 
-              color={col.color} 
-              leads={leads.filter(l => l.status === col.id)} 
-              onConvert={handleConvert}
-            />
-          ))}
+  // Handle drawer updates
+  const updateLeadField = async (field: keyof Lead, value: any) => {
+    if (!selectedLead) return
+    // Optimistic update
+    setSelectedLead({ ...selectedLead, [field]: value })
+    setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, [field]: value } : l))
+    
+    // DB Update
+    await supabase.from('leads').update({ [field]: value }).eq('id', selectedLead.id)
+  }
 
-          <DragOverlay dropAnimation={dropAnimation}>
-            {activeLead ? <LeadCard lead={activeLead} isOverlay onConvert={() => {}} /> : null}
-          </DragOverlay>
-        </DndContext>
+  return (
+    <div style={{ display: 'flex', width: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, transition: 'margin-right 0.3s ease', marginRight: selectedLead ? '400px' : '0' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
+          <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={16} /> Add Lead Manually
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '24px', alignItems: 'flex-start' }}>
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+            {COLUMNS.map(col => (
+              <Column 
+                key={col.id} 
+                id={col.id} 
+                title={col.title} 
+                color={col.color} 
+                leads={leads.filter(l => l.status === col.id)} 
+                onConvert={handleConvert}
+                onLeadClick={(lead) => setSelectedLead(lead)}
+              />
+            ))}
+
+            <DragOverlay dropAnimation={dropAnimation}>
+              {activeLead ? <LeadCard lead={activeLead} isOverlay /> : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
       </div>
+
+      {/* --- Lead Details Slide-out Drawer --- */}
+      <AnimatePresence>
+        {selectedLead && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+            className="glass-panel"
+            style={{
+              position: 'fixed', right: 0, top: 0, bottom: 0, width: '400px',
+              background: 'var(--surface)', borderLeft: '1px solid var(--surface-border)',
+              zIndex: 100, display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 32px rgba(0,0,0,0.5)'
+            }}
+          >
+            {/* Drawer Header */}
+            <div style={{ padding: '24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{selectedLead.company_name}</h2>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{selectedLead.contact_name}</div>
+              </div>
+              <button onClick={() => setSelectedLead(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div style={{ padding: '24px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Quick Actions Placeholder */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <button className="btn" onClick={() => alert('Log Call action would open a dialer or note prompt.')} style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-primary)' }}>
+                  <Phone size={14} color="var(--accent-primary)" /> Log Call
+                </button>
+                <button className="btn" onClick={() => window.location.href = `mailto:${selectedLead.email}`} style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-primary)' }}>
+                  <Mail size={14} color="var(--accent-primary)" /> Email
+                </button>
+                <button className="btn" onClick={() => alert('Meet action would generate a calendar invite.')} style={{ padding: '8px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-primary)' }}>
+                  <Calendar size={14} color="var(--accent-primary)" /> Meet
+                </button>
+              </div>
+
+              {/* Editable Fields */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Status</label>
+                  <select 
+                    value={selectedLead.status} 
+                    onChange={(e) => updateLeadField('status', e.target.value)}
+                    className="input" style={{ width: '100%', padding: '8px 12px', appearance: 'none', textTransform: 'capitalize' }}
+                  >
+                    {COLUMNS.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Priority</label>
+                    <select 
+                      value={selectedLead.priority || 'medium'} 
+                      onChange={(e) => updateLeadField('priority', e.target.value)}
+                      className="input" style={{ width: '100%', padding: '8px 12px', appearance: 'none' }}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Follow Up Date</label>
+                    <input 
+                      type="date" 
+                      value={selectedLead.follow_up_date || ''} 
+                      onChange={(e) => updateLeadField('follow_up_date', e.target.value)}
+                      className="input" style={{ width: '100%', padding: '8px 12px', colorScheme: 'dark' }} 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Lead Source</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Organic, Referral, Outbound"
+                    value={selectedLead.lead_source || ''} 
+                    onChange={(e) => updateLeadField('lead_source', e.target.value)}
+                    className="input" style={{ width: '100%', padding: '8px 12px' }} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Est. Close Date</label>
+                  <input 
+                    type="date" 
+                    value={selectedLead.estimated_close_date || ''} 
+                    onChange={(e) => updateLeadField('estimated_close_date', e.target.value)}
+                    className="input" style={{ width: '100%', padding: '8px 12px', colorScheme: 'dark' }} 
+                  />
+                </div>
+              </div>
+
+              {/* Message from Lead */}
+              {selectedLead.message && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Initial Message</label>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px', borderLeft: '2px solid var(--accent-primary)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                    "{selectedLead.message}"
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Add Lead Modal */}
       {isAddModalOpen && (

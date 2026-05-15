@@ -22,7 +22,7 @@ export default async function DashboardLayout({
       .eq('id', user.id)
       .single()
 
-    role = 'admin'
+    role = profile?.role || 'admin'
     email = profile?.email || user.email || 'dev@aura.local'
   }
 

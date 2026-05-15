@@ -30,12 +30,12 @@ export default async function BusinessesPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     const { data, error } = await supabase.from('businesses').insert({
-      name: 'Untitled Business',
+      name: 'Untitled Client',
       created_by: user?.id || null,
     }).select('id').single()
 
     if (error) {
-      console.error('Error creating business:', error)
+      console.error('Error creating client:', error)
       throw new Error(error.message)
     }
 
@@ -49,14 +49,14 @@ export default async function BusinessesPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Executive Command: Businesses</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '8px' }}>Executive Command: Clients</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
-            Monitor client health, financial burn rate, and active project velocity.
+            Monitor brand health, financial burn rate, and active campaign velocity.
           </p>
         </div>
         <form action={createBusiness}>
           <button type="submit" className="btn btn-primary">
-            <Plus size={16} /> New Business
+            <Plus size={16} /> New Client
           </button>
         </form>
       </div>
@@ -67,10 +67,10 @@ export default async function BusinessesPage() {
             <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', border: '1px solid var(--surface-border)' }}>
               <Building2 size={28} color="var(--text-primary)" />
             </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>No Businesses Yet</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>No Clients Yet</h2>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto', lineHeight: 1.6 }}>
-              Register your first client business by clicking the button above. 
-              Once registered, you can track their financial health and projects.
+              Register your first brand by clicking the button above. 
+              Once registered, you can track their financial health and campaigns.
             </p>
           </div>
         ) : (
@@ -114,7 +114,7 @@ export default async function BusinessesPage() {
                       <div>
                         <h3 style={{ fontWeight: 600, fontSize: '1.125rem', marginBottom: '4px' }}>{biz.name}</h3>
                         <div style={{ display: 'flex', gap: '12px', fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>
-                          <span>{biz.projects?.length || 0} active projects</span>
+                          <span>{biz.projects?.length || 0} active campaigns</span>
                         </div>
                       </div>
                     </div>

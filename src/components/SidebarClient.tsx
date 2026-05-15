@@ -21,6 +21,7 @@ import {
   HardDrive,
   Plus,
   Wallet,
+  Settings,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
@@ -35,10 +36,10 @@ function getNavItems(role: string): NavItem[] {
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   ]
 
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'manager') {
     items.push({ name: 'CRM & Leads', href: '/dashboard/leads', icon: Users })
-    items.push({ name: 'Businesses', href: '/dashboard/businesses', icon: Building2 })
-    items.push({ name: 'Deliverables', href: '/dashboard/projects', icon: FolderKanban })
+    items.push({ name: 'Clients', href: '/dashboard/businesses', icon: Building2 })
+    items.push({ name: 'Campaigns', href: '/dashboard/projects', icon: FolderKanban })
     items.push({ name: 'Global Drive', href: '/dashboard/drive', icon: HardDrive })
     items.push({ name: 'Capacity', href: '/dashboard/capacity', icon: BarChart })
     items.push({ name: 'Finances', href: '/dashboard/finances', icon: Wallet })
@@ -46,17 +47,13 @@ function getNavItems(role: string): NavItem[] {
     items.push({ name: 'Docs', href: '/dashboard/docs', icon: FileText })
     items.push({ name: 'Automations', href: '/dashboard/automations', icon: Sparkles })
     items.push({ name: 'Inbox', href: '/dashboard/inbox', icon: Bell })
-    items.push({ name: 'Team', href: '/dashboard/settings', icon: Users })
-  } else if (role === 'manager') {
-    items.push({ name: 'Deliverables', href: '/dashboard/projects', icon: FolderKanban })
-    items.push({ name: 'Calendar', href: '/dashboard/calendar', icon: Calendar })
-    items.push({ name: 'Docs', href: '/dashboard/docs', icon: FileText })
+    items.push({ name: 'Team', href: '/dashboard/team', icon: Users })
   } else if (role === 'contractor') {
-    items.push({ name: 'My Deliverables', href: '/dashboard/projects', icon: FolderKanban })
+    items.push({ name: 'My Campaigns', href: '/dashboard/projects', icon: FolderKanban })
     items.push({ name: 'Calendar', href: '/dashboard/calendar', icon: Calendar })
     items.push({ name: 'Docs', href: '/dashboard/docs', icon: FileText })
   } else if (role === 'client') {
-    items.push({ name: 'Deliverables', href: '/dashboard/projects', icon: FolderKanban })
+    items.push({ name: 'Campaigns', href: '/dashboard/projects', icon: FolderKanban })
     items.push({ name: 'Calendar', href: '/dashboard/calendar', icon: Calendar })
     items.push({ name: 'Docs', href: '/dashboard/docs', icon: FileText })
   }
@@ -90,7 +87,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
           .from('workspace_sections')
           .select('id, title, workspace_pages(id, title, icon)')
           .order('sort_order', { ascending: true })
-        
+
         if (!error && data) {
           setSections(data)
         }
@@ -131,7 +128,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
       .insert({ section_id: sectionId, title, page_type: type, icon: type === 'doc' ? '📄' : type === 'kanban' ? '📋' : type === 'table' ? '📊' : '🎨', created_by: user?.id })
       .select('id, title, icon, page_type')
       .single()
-    
+
     if (data) {
       setSections(prev => prev.map(s => {
         if (s.id === sectionId) {
@@ -157,7 +154,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
   return (
     <>
       {/* Sidebar */}
-      <motion.aside 
+      <motion.aside
         initial={{ width: 240, opacity: 1 }}
         animate={{ width: sidebarWidth, opacity: isOpen ? 1 : 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
@@ -216,7 +213,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
                     <div style={{ padding: '8px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ display: isOpen ? 'inline' : 'none' }}>{section.title}</span>
                       {isOpen && (
-                        <button 
+                        <button
                           onClick={() => handleCreatePage(section.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px' }}
                           title="Add Page"
@@ -238,14 +235,14 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
                     ))}
                   </div>
                 ))}
-                
+
                 {/* Create Section Button */}
                 {isOpen && role === 'admin' && (
-                  <button 
+                  <button
                     onClick={handleCreateSection}
-                    style={{ 
-                      display: 'flex', alignItems: 'center', gap: '8px', 
-                      padding: '8px', marginTop: '8px', background: 'none', border: 'none', 
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '8px', marginTop: '8px', background: 'none', border: 'none',
                       color: 'var(--text-tertiary)', fontSize: '0.8125rem', cursor: 'pointer',
                       borderRadius: '6px'
                     }}
@@ -276,6 +273,14 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
             </div>
           </div>
+          <Link
+            href="/dashboard/settings"
+            className="nav-item"
+            style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}
+          >
+            <Settings size={18} style={{ flexShrink: 0 }} />
+            <span style={{ display: isOpen ? 'inline' : 'none' }}>Preferences</span>
+          </Link>
           <button
             onClick={handleSignOut}
             className="nav-item"
@@ -288,7 +293,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
       </motion.aside>
 
       {/* Floating Topbar */}
-      <motion.div 
+      <motion.div
         initial={{ left: 240 }}
         animate={{ left: sidebarWidth }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
@@ -302,7 +307,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
+          <button
             onClick={() => setIsOpen(!isOpen)}
             style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '6px', borderRadius: '6px' }}
             onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-hover)'}
@@ -311,8 +316,8 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
           >
             {isOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
-          
-          <div 
+
+          <div
             style={{ position: 'relative', width: '280px', cursor: 'pointer' }}
             onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
           >
@@ -335,8 +340,17 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
             </div>
           </div>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Link 
+            href="/dashboard/settings"
+            style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: '6px', borderRadius: '6px' }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-hover)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'none'}
+            title="Preferences"
+          >
+            <Settings size={18} />
+          </Link>
           <button style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
             <Bell size={18} />
           </button>
