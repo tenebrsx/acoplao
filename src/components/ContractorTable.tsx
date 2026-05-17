@@ -126,7 +126,7 @@ export function ContractorTable() {
 
     const { data, error } = await supabase
       .from('role_invites')
-      .insert({ role: selectedInviteRole, created_by: user.id })
+      .insert({ role: selectedInviteRole, created_by: user?.id || '' })
       .select('id')
       .single()
 

@@ -1,55 +1,76 @@
-/* ===== DESIGN TOKENS (Apple / Notion Minimalist) ===== */
-:root {
-  /* Core palette - Deep refined dark mode */
-  --bg-primary: #000000;
-  --bg-secondary: #000000;
-  --bg-tertiary: #1c1c1e;
-  --bg-elevated: #2c2c2e;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  /* Surface / Cards */
-  --surface: #121212;
-  --surface-hover: #1c1c1e;
-  --surface-border: #2c2c2e;
-  --surface-border-hover: #3a3a3c;
+@layer base {
+  :root {
+    /* Forest Green Agency Theme */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: 142 76% 36%;
+    --radius: 0.625rem;
+    
+    /* Legacy tokens for compatibility */
+    --bg-primary: #000000;
+    --bg-secondary: #000000;
+    --bg-tertiary: #1c1c1e;
+    --bg-elevated: #2c2c2e;
+    --surface: #121212;
+    --surface-hover: #1c1c1e;
+    --surface-border: #2c2c2e;
+    --surface-border-hover: #3a3a3c;
+    --glass-bg: rgba(18, 18, 18, 0.8);
+    --glass-border: #2c2c2e;
+    --glass-blur: 20px;
+    --text-primary: #ffffff;
+    --text-secondary: #98989d;
+    --text-tertiary: #636366;
+    --text-inverse: #000000;
+    --accent-primary: #22c55e;
+    --accent-hover: #16a34a;
+    --accent-secondary: #0a84ff;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #0a84ff;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --duration-fast: 150ms;
+    --duration-base: 250ms;
+    --duration-slow: 400ms;
+  }
+}
 
-  /* Glassmorphism (Subtle) */
-  --glass-bg: rgba(18, 18, 18, 0.8);
-  --glass-border: #2c2c2e;
-  --glass-blur: 20px;
-
-  /* Text */
-  --text-primary: #ffffff;
-  --text-secondary: #98989d;
-  --text-tertiary: #636366;
-  --text-inverse: #000000;
-
-  /* Monochrome & Functional Accents */
-  --accent-primary: #ffffff; /* Monochrome primary */
-  --accent-hover: #e5e5ea;
-  --accent-secondary: #0a84ff; /* Apple Blue for subtle links if needed */
-  
-  /* Status colors */
-  --success: #32d74b;
-  --warning: #ffd60a;
-  --error: #ff453a;
-  --info: #0a84ff;
-
-  /* Radius (Apple-like continuous curves) */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
-
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-
-  /* Transitions */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --duration-fast: 150ms;
-  --duration-base: 250ms;
-  --duration-slow: 400ms;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }
 
 /* ===== RESET ===== */
@@ -72,7 +93,7 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
-  font-size: 14px; /* Notion default */
+  font-size: 14px;
 }
 
 a {
@@ -103,253 +124,24 @@ input::placeholder, textarea::placeholder {
   color: var(--text-tertiary);
 }
 
-/* ===== UTILITIES ===== */
-.glass-panel {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-}
-
-.text-gradient {
-  color: var(--text-primary); /* Removed gradient */
-}
-
-/* ===== COMPONENTS ===== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all var(--duration-fast) var(--ease-out);
-  white-space: nowrap;
-}
-
-.btn-primary {
-  background: var(--accent-primary);
-  color: var(--text-inverse);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-}
-
-.btn-secondary {
-  background: var(--surface-hover);
-  border: 1px solid var(--surface-border);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-  background: var(--surface-border);
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.8125rem;
-  gap: 6px;
-}
-
-.btn-danger {
-  background: rgba(255, 69, 58, 0.1);
-  color: var(--error);
-  border: 1px solid rgba(255, 69, 58, 0.2);
-}
-
-.btn-danger:hover {
-  background: rgba(255, 69, 58, 0.2);
-}
-
-/* Badge */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid var(--surface-border);
-}
-
-/* Avatar */
-.avatar {
-  border-radius: var(--radius-sm); /* Squareish like Notion */
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  flex-shrink: 0;
-  border: 1px solid var(--surface-border);
-}
-.avatar-sm { width: 24px; height: 24px; font-size: 0.75rem; }
-.avatar-md { width: 32px; height: 32px; font-size: 0.875rem; }
-.avatar-lg { width: 40px; height: 40px; font-size: 1rem; }
-
-/* Table */
-.table-wrapper {
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--surface);
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table thead tr {
-  border-bottom: 1px solid var(--surface-border);
-}
-
-.table th {
-  padding: 10px 16px;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.table td {
-  padding: 12px 16px;
-  font-size: 0.875rem;
-  border-bottom: 1px solid var(--surface-border);
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background: var(--surface-hover);
-}
-
-/* Spinner */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
 /* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .animate-in {
   animation: fadeIn 0.4s var(--ease-out) forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .delay-100 { animation-delay: 50ms; }
 .delay-200 { animation-delay: 100ms; }
 
-/* ===== DASHBOARD LAYOUT ===== */
-.app-container {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 240px;
-  border-right: 1px solid var(--surface-border);
-  background: var(--bg-secondary);
-  display: flex;
-  flex-direction: column;
-  padding: 20px 16px;
-}
-
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  position: relative;
-  background: var(--bg-primary);
-}
-
-.topbar {
-  height: 56px;
-  border-bottom: 1px solid var(--surface-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  background: var(--bg-primary);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.page-wrapper {
-  padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  transition: background var(--duration-fast) var(--ease-out);
-  font-weight: 500;
-  font-size: 0.875rem;
-  margin-bottom: 2px;
-}
-
-.nav-item:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.nav-item.active {
-  background: var(--surface-border);
-  color: var(--text-primary);
-}
-
-/* Dashboard Cards */
-.metric-card {
-  padding: 20px;
-  border-radius: var(--radius-md);
+/* ===== UTILITIES ===== */
+.glass-panel {
   background: var(--surface);
   border: 1px solid var(--surface-border);
-}
-
-.metric-label {
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.metric-value {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Grid System */
-.grid {
-  display: grid;
-  gap: 16px;
-}
-.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-
-/* Ambient background removed */
-.ambient-glow {
-  display: none;
+  border-radius: var(--radius-md);
 }
 
 /* ===== CMDK COMMAND PALETTE ===== */
@@ -445,10 +237,6 @@ input::placeholder, textarea::placeholder {
   font-size: 0.9rem;
 }
 
-.hover-border-light:hover {
-  border-color: var(--text-tertiary) !important;
-}
-
 .hover-card-biz {
   transition: border-color 0.2s, transform 0.2s;
 }
@@ -456,4 +244,26 @@ input::placeholder, textarea::placeholder {
 .hover-card-biz:hover {
   border-color: var(--text-secondary) !important;
   transform: translateY(-2px);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .finance-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .finance-sidebar {
+    position: static !important;
+  }
+  .calendar-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .calendar-sidebar {
+    position: static !important;
+    height: auto !important;
+  }
+  .calendar-drawer {
+    position: static !important;
+    height: auto !important;
+    max-height: 400px;
+  }
 }

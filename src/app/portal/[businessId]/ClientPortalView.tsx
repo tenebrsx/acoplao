@@ -14,6 +14,7 @@ export function ClientPortalView({ business, assets, invoices }: { business: any
   const allDeliverables = business.projects?.flatMap((p: any) => p.deliverables) || []
   const allPhases = allDeliverables.flatMap((d: any) => d.deliverable_phases || [])
   const completedPhases = allPhases.filter((p: any) => p.is_completed).length
+  const completedDeliverables = allDeliverables.filter((d: any) => d.status_v2 === 'approved' || d.status_v2 === 'published').length
   const progressPercent = allPhases.length > 0 ? Math.round((completedPhases / allPhases.length) * 100) : 0
 
   return (

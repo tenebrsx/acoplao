@@ -6,9 +6,11 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, MessageSquare, Send, XCircle, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import confetti from 'canvas-confetti'
+import { useToast } from '@/components/ToastProvider'
 
 export function DeliverableReviewClient({ deliverable, businessId }: { deliverable: any, businessId: string }) {
   const router = useRouter()
+  const { toast } = useToast()
   const [feedback, setFeedback] = useState('')
   const [saving, setSaving] = useState(false)
   const isApproved = deliverable.status_v2 === 'approved'
@@ -49,14 +51,14 @@ export function DeliverableReviewClient({ deliverable, businessId }: { deliverab
       router.refresh()
     } catch (err) {
       console.error(err)
-      alert('Failed to submit decision')
+      toast('Failed to submit decision', 'error')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+    <div style={{ display: 'flex', width: '100%', height: '100%', flexWrap: 'wrap' }}>
       
       {/* Left: Media Vault */}
       <div style={{ flex: 1, padding: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -78,7 +80,7 @@ export function DeliverableReviewClient({ deliverable, businessId }: { deliverab
       </div>
 
       {/* Right: Interaction Panel */}
-      <div style={{ width: '400px', background: 'var(--bg-primary)', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: 'min(400px, 100vw)', background: 'var(--bg-primary)', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px', borderBottom: '1px solid var(--surface-border)' }}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MessageSquare size={18} color="var(--accent-primary)" /> Feedback & Approval

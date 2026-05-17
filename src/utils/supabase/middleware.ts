@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('is_active')
-      .eq('id', user.id)
+      .eq('id', user?.id || '')
       .single()
 
     if (profile && profile.is_active === false) {
@@ -59,16 +59,21 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // DEV OVERRIDE: disabled auth redirect for testing
-  // if (
-  //   !user &&
-  //   !request.nextUrl.pathname.startsWith('/login') &&
-  //   request.nextUrl.pathname.startsWith('/dashboard')
-  // ) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/login'
-  //   return NextResponse.redirect(url)
-  // }
+  /*
+  if (
+    !user &&
+    !request.nextUrl.pathname.startsWith('/login') &&
+    !request.nextUrl.pathname.startsWith('/landing') &&
+    !request.nextUrl.pathname.startsWith('/portal') &&
+    !request.nextUrl.pathname.startsWith('/review') &&
+    !request.nextUrl.pathname.startsWith('/shared-docs') &&
+    !request.nextUrl.pathname.startsWith('/api')
+  ) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+  */
 
   return supabaseResponse
 }

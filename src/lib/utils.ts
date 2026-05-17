@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 export function formatDate(date: Date | { seconds: number }): string {
     const d = date instanceof Date ? date : new Date((date as any).seconds * 1000);
     return d.toLocaleDateString("en-US", {

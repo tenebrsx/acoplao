@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { useRouter } from 'next/navigation'
-import { Building2, FolderKanban, FileText, Search, Settings, Home } from 'lucide-react'
+import { Building2, FolderKanban, FileText, Search, Settings, Home, LayoutDashboard } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
 export function CommandPaletteClient() {
@@ -75,70 +75,78 @@ export function CommandPaletteClient() {
             <Command.Empty>No results found.</Command.Empty>
 
             <Command.Group heading="Navigation">
-              <Command.Item onSelect={() => { router.push('/dashboard'); setOpen(false) }}>
+              <Command.Item onSelect={() => { router.push('/'); setOpen(false) }}>
                 <Home size={14} /> Home Dashboard
               </Command.Item>
-              <Command.Item onSelect={() => { router.push('/dashboard/businesses'); setOpen(false) }}>
-                <Building2 size={14} /> Businesses
+              <Command.Item onSelect={() => { router.push('/businesses'); setOpen(false) }}>
+                <Building2 size={16} />
+                <span>Clients</span>
               </Command.Item>
-              <Command.Item onSelect={() => { router.push('/dashboard/projects'); setOpen(false) }}>
-                <FolderKanban size={14} /> Projects
+              <Command.Item onSelect={() => { router.push('/projects'); setOpen(false) }}>
+                <FolderKanban size={16} />
+                <span>Campaigns</span>
               </Command.Item>
-              <Command.Item onSelect={() => { router.push('/dashboard/docs'); setOpen(false) }}>
-                <FileText size={14} /> Docs
+              <Command.Item onSelect={() => { router.push('/docs'); setOpen(false) }}>
+                <FileText size={16} />
+                <span>Docs</span>
               </Command.Item>
-              <Command.Item onSelect={() => { router.push('/dashboard/settings'); setOpen(false) }}>
-                <Settings size={14} /> Settings
+              <Command.Item onSelect={() => { router.push('/settings'); setOpen(false) }}>
+                <Settings size={16} />
+                <span>Preferences</span>
               </Command.Item>
             </Command.Group>
 
             {businesses.length > 0 && (
-              <Command.Group heading="Recent Businesses">
+              <Command.Group heading="Clients">
                 {businesses.map((biz) => (
                   <Command.Item 
                     key={biz.id} 
-                    onSelect={() => { router.push(`/dashboard/businesses/${biz.id}`); setOpen(false) }}
+                    onSelect={() => { router.push(`/businesses/${biz.id}`); setOpen(false) }}
                   >
-                    <Building2 size={14} /> {biz.name}
+                    <Building2 size={16} />
+                    <span>{biz.name}</span>
                   </Command.Item>
                 ))}
               </Command.Group>
             )}
 
             {projects.length > 0 && (
-              <Command.Group heading="Recent Projects">
+              <Command.Group heading="Campaigns">
                 {projects.map((proj) => (
                   <Command.Item 
                     key={proj.id} 
-                    onSelect={() => { router.push(`/dashboard/projects/${proj.id}`); setOpen(false) }}
+                    onSelect={() => { router.push(`/projects/${proj.id}`); setOpen(false) }}
                   >
-                    <FolderKanban size={14} /> {proj.title}
+                    <FolderKanban size={16} />
+                    <span>{proj.title}</span>
                   </Command.Item>
                 ))}
               </Command.Group>
             )}
 
             {workspaces.length > 0 && (
-              <Command.Group heading="Recent Workspaces">
+              <Command.Group heading="Workspaces">
                 {workspaces.map((work) => (
                   <Command.Item 
                     key={work.id} 
-                    onSelect={() => { router.push(`/dashboard/workspace/${work.id}`); setOpen(false) }}
+                    onSelect={() => { router.push(`/workspace/${work.id}`); setOpen(false) }}
                   >
-                    <span style={{ marginRight: '8px' }}>{work.icon || '📄'}</span> {work.title}
+                    <LayoutDashboard size={16} />
+                    <span>{work.title}</span>
                   </Command.Item>
                 ))}
               </Command.Group>
             )}
 
             {docs.length > 0 && (
-              <Command.Group heading="Recent Documents">
+              <Command.Group heading="Documents">
                 {docs.map((doc) => (
                   <Command.Item 
                     key={doc.id} 
-                    onSelect={() => { router.push(`/dashboard/docs/${doc.id}`); setOpen(false) }}
+                    onSelect={() => { router.push(`/docs/${doc.id}`); setOpen(false) }}
                   >
-                    <FileText size={14} /> {doc.title}
+                    <FileText size={16} />
+                    <span>{doc.title}</span>
                   </Command.Item>
                 ))}
               </Command.Group>

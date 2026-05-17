@@ -51,7 +51,7 @@ export default function LoginPage() {
     } else {
       // Success! Redirection is handled by the middleware/layout typically, 
       // but let's push to dashboard to be safe.
-      router.push('/dashboard')
+      router.push('/')
     }
   }
 

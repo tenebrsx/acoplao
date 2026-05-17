@@ -69,7 +69,7 @@ export function ReviewRoomClient({ token, deliverable, project, business, existi
   const mockVideo = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden', flexWrap: 'wrap' }}>
       {/* Left: Video Player */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000', position: 'relative' }}>
         
@@ -131,7 +131,7 @@ export function ReviewRoomClient({ token, deliverable, project, business, existi
       </div>
 
       {/* Right: Comments & Approval Sidebar */}
-      <div style={{ width: '400px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--surface-border)', background: 'var(--bg-primary)' }}>
+      <div style={{ width: 'min(400px, 100vw)', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--surface-border)', background: 'var(--bg-primary)' }}>
         
         {/* Comments List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>

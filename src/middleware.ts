@@ -16,6 +16,6 @@ export const config = {
      * - api/review (public review API)
      * - docs/shared (public document sharing)
      */
-    '/((?!_next/static|_next/image|favicon.ico|review|api/review|docs/shared|dashboard/capacity|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|review|api/review|shared-docs|capacity|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
