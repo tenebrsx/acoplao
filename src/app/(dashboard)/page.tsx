@@ -1,89 +1,77 @@
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { verifySessionCookie } from '@/lib/firebase-admin'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { CommandCenterClient } from './CommandCenterClient'
 
 export default async function DashboardOverview() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('firebase-session')?.value
 
+  let userEmail = 'commander'
   let userName = 'Commander'
   let role = 'admin'
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email, role')
-      .eq('id', user?.id || '')
-      .single()
-    userName = profile?.email?.split('@')[0] || 'Commander'
-    role = profile?.role || 'admin'
+
+  if (sessionToken) {
+    const decoded = await verifySessionCookie(sessionToken)
+    if (decoded?.email) {
+      userEmail = decoded.email
+      userName = decoded.email.split('@')[0]
+      const supabase = createAdminClient()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('email', decoded.email)
+        .single()
+      role = profile?.role || 'admin'
+    }
   }
 
-  const isAdmin = role === 'admin'
-  const isManager = role === 'manager'
-
+  const supabase = createAdminClient()
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const today = now.toISOString().split('T')[0]
 
   const [
-    invoicesRes,
-    expensesRes,
     projectsRes,
     projectPhasesRes,
-    activityRes,
-    notificationsRes,
     eventsRes,
-    businessesRes,
-    tasksRes
+    tasksRes,
+    clientsRes,
+    deliverablesRes
   ] = await Promise.all([
-    supabase.from('invoices').select('id, amount, status, due_date, business_id'),
-    supabase.from('expenses').select('id, amount, category, expense_date').gte('expense_date', startOfMonth),
-    supabase.from('projects').select('id, title, status, bottleneck_status, businesses(name), project_phases(id, is_completed, scheduled_date), deliverables(id, status_v2)').order('created_at', { ascending: false }).limit(10),
-    supabase.from('project_phases').select('id, phase_name, scheduled_date, is_completed, projects(id, title)').eq('is_completed', false).order('scheduled_date', { ascending: true }).limit(15),
-    supabase.from('campaign_activity').select('*, profiles(email)').order('created_at', { ascending: false }).limit(10),
-    supabase.from('notifications').select('*').eq('user_id', user?.id || '').eq('is_read', false).order('created_at', { ascending: false }).limit(5),
-    supabase.from('calendar_events').select('*').or(`assigned_to.eq.${user?.id},assigned_to.is.null`).gte('start_time', today).order('start_time', { ascending: true }).limit(10),
-    supabase.from('businesses').select('id, name'),
-    supabase.from('tasks').select('*').eq('user_id', user?.id || '').neq('status', 'done').order('due_date', { ascending: true }).limit(10)
+    supabase.from('projects').select('id, title, status, bottleneck_status, businesses(name), project_phases(id, is_completed, scheduled_date)').order('created_at', { ascending: false }).limit(8),
+    supabase.from('project_phases').select('id, phase_name, scheduled_date, is_completed, projects(id, title)').eq('is_completed', false).order('scheduled_date', { ascending: true }).limit(50),
+    supabase.from('calendar_events').select('id, title, start_time').gte('start_time', startOfMonth).order('start_time', { ascending: true }).limit(50),
+    supabase.from('tasks').select('*').eq('user_email', userEmail).neq('status', 'done').order('due_date', { ascending: true }).limit(10),
+    supabase.from('businesses').select('*', { count: 'exact', head: true }),
+    supabase.from('project_phases').select('*', { count: 'exact', head: true }).eq('is_completed', false)
   ])
 
   const projects = projectsRes.data || []
   const projectPhases = projectPhasesRes.data || []
 
   const healthDistribution = {
-    on_track: projects.filter((p: any) => p.bottleneck_status === 'on_track' || !p.bottleneck_status).length,
+    on_track: projects.filter((p: any) => !p.bottleneck_status || p.bottleneck_status === 'on_track').length,
     waiting_client: projects.filter((p: any) => p.bottleneck_status === 'waiting_client').length,
     waiting_team: projects.filter((p: any) => p.bottleneck_status === 'waiting_team').length,
-    blocked: projects.filter((p: any) => p.bottleneck_status === 'blocked').length
+    blocked: projects.filter((p: any) => p.bottleneck_status === 'blocked').length,
   }
 
-  const overduePhases = projectPhases.filter((p: any) => {
-    if (!p.scheduled_date) return false
-    return new Date(p.scheduled_date) < new Date(today)
-  })
-
-  const outstandingInvoices = (invoicesRes.data || []).filter((i: any) => i.status !== 'paid')
-  const monthlyRevenue = (invoicesRes.data || [])
-    .filter((i: any) => i.status === 'paid')
-    .reduce((s: number, i: any) => s + Number(i.amount), 0)
-
   const dashboardData = {
-    invoices: invoicesRes.data || [],
-    expenses: expensesRes.data || [],
     projects,
     phases: projectPhases,
-    activity: activityRes.data || [],
-    notifications: notificationsRes.data || [],
     events: eventsRes.data || [],
-    businesses: businessesRes.data || [],
     tasks: tasksRes.data || [],
     userName,
+    userEmail,
     role,
     healthDistribution,
-    overduePhases: overduePhases.length,
-    outstandingReceivables: outstandingInvoices.reduce((s: number, i: any) => s + Number(i.amount), 0),
-    monthlyRevenue,
-    unreadNotifications: (notificationsRes.data || []).length
+    clients: clientsRes.count || 0,
+    activeDeliverables: deliverablesRes.count || 0,
+    activeProjects: projects.filter((p: any) => p.status === 'active').length,
+    totalProjects: projects.length,
+    outstandingReceivables: 0,
+    monthlyRevenue: 0,
   }
 
   return (

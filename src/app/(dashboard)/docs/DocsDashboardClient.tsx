@@ -25,26 +25,33 @@ export function DocsDashboardClient({
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const [sortBy, setSortBy] = useState<SortOption>('updated')
 
+  const childCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    initialDocuments.forEach((doc: any) => {
+      if (doc.parent_id) {
+        counts[doc.parent_id] = (counts[doc.parent_id] || 0) + 1
+      }
+    })
+    return counts
+  }, [initialDocuments])
+
   const filteredAndSortedDocs = useMemo(() => {
     let docs = [...initialDocuments]
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      docs = docs.filter(doc => 
-        doc.title.toLowerCase().includes(query) || 
+      docs = docs.filter(doc =>
+        doc.title.toLowerCase().includes(query) ||
         doc.tags?.some((t: string) => t.toLowerCase().includes(query))
       )
     }
 
-    // Tab filter
     if (activeTab === 'mine') {
       docs = docs.filter(doc => doc.created_by === userId)
     } else if (activeTab === 'shared') {
       docs = docs.filter(doc => doc.is_public)
     }
 
-    // Sort
     docs.sort((a, b) => {
       if (sortBy === 'updated') {
         return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -222,7 +229,7 @@ export function DocsDashboardClient({
           {viewMode === 'grid' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
               {filteredAndSortedDocs.map((doc: any) => (
-                <DocCard key={doc.id} doc={doc} isFavorite={favoriteIds.includes(doc.id)} />
+                <DocCard key={doc.id} doc={doc} isFavorite={favoriteIds.includes(doc.id)} childCount={childCounts[doc.id] || 0} />
               ))}
             </div>
           ) : (

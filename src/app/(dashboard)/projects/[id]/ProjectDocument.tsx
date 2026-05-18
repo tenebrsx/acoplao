@@ -45,7 +45,7 @@ export function ProjectDocument({ projectId }: { projectId: string }) {
     loadOrCreateDoc()
   }, [projectId, supabase])
 
-  const handleUpdate = async (content: any, wordCount: number) => {
+  const handleUpdate = async (content: any, wordCount: number, _plainText: string) => {
     if (!doc) return
     setSaving(true)
     

@@ -9,8 +9,10 @@ import {
   LogOut, Sparkles, Bell, Search, FileText, PanelLeftClose,
   PanelLeftOpen, Calendar, BarChart, HardDrive, Plus, Wallet,
   Settings, ChevronDown, ClipboardList, StickyNote, ListChecks,
+  BookOpen, Sun, Moon,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { useTheme } from './ThemeProvider'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -50,7 +52,8 @@ function getNavSections(role: string): NavSection[] {
     productivity.push(
       { name: 'Tasks', href: '/tasks', icon: ListChecks },
       { name: 'Lists', href: '/lists', icon: ClipboardList },
-      { name: 'Notes', href: '/notes', icon: StickyNote }
+      { name: 'Notes', href: '/notes', icon: StickyNote },
+      { name: 'UpNotes', href: '/upnotes', icon: BookOpen },
     )
   } else if (role === 'contractor') {
     work.push(
@@ -64,7 +67,8 @@ function getNavSections(role: string): NavSection[] {
     productivity.push(
       { name: 'Tasks', href: '/tasks', icon: ListChecks },
       { name: 'Lists', href: '/lists', icon: ClipboardList },
-      { name: 'Notes', href: '/notes', icon: StickyNote }
+      { name: 'Notes', href: '/notes', icon: StickyNote },
+      { name: 'UpNotes', href: '/upnotes', icon: BookOpen },
     )
   } else if (role === 'client') {
     work.push({ name: 'Projects', href: '/projects', icon: FolderKanban })
@@ -73,7 +77,7 @@ function getNavSections(role: string): NavSection[] {
       { name: 'Docs', href: '/docs', icon: FileText }
     )
     productivity.push(
-      { name: 'Notes', href: '/notes', icon: StickyNote }
+      { name: 'Notes', href: '/notes', icon: StickyNote },
     )
   }
 
@@ -100,6 +104,7 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
   const [dialogSectionId, setDialogSectionId] = useState<string>('')
   const [dialogInput, setDialogInput] = useState('')
   const [dialogPageType, setDialogPageType] = useState('canvas')
+  const { resolvedTheme, setTheme } = useTheme()
   const supabase = createClient()
 
   const fetchFavorites = useCallback(async () => {
@@ -147,6 +152,12 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
       window.removeEventListener('favorites-updated', fetchFavorites)
     }
   }, [fetchFavorites, supabase])
+
+  useEffect(() => {
+    if (pathname.startsWith('/docs')) {
+      setIsOpen(false)
+    }
+  }, [pathname])
 
   const toggleSection = (title: string) => {
     setExpandedSections(prev => prev.includes(title) ? prev.filter(t => t !== title) : [...prev, title])
@@ -340,6 +351,19 @@ export function SidebarClient({ role, email }: { role: string; email: string }) 
                 </div>
               )}
             </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors mb-1 w-full text-left ${isOpen ? '' : 'justify-center'}`}
+                >
+                  {resolvedTheme === 'dark' ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
+                  {isOpen && <span>{resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+                </button>
+              </TooltipTrigger>
+              {!isOpen && <TooltipContent side="right">{resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}</TooltipContent>}
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href="/settings" className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors mb-1 ${isOpen ? '' : 'justify-center'}`}>

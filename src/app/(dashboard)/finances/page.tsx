@@ -1,65 +1,51 @@
-import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { verifySessionCookie } from '@/lib/firebase-admin'
+import { createAdminClient } from '@/utils/supabase/admin'
 import Link from 'next/link'
-import { DollarSign, TrendingUp, TrendingDown, Receipt, CreditCard, Activity, Zap, Target, PieChart, Landmark } from 'lucide-react'
-import { ReceivablesKanbanClient } from './ReceivablesKanbanClient'
-import { ProfitEngineChart } from './ProfitEngineChart'
-
-import { ExportDataClient } from './ExportDataClient'
+import { DollarSign, TrendingUp, TrendingDown, Receipt, Activity, Zap, Landmark, Plus } from 'lucide-react'
+import { InvoiceListClient } from './InvoiceListClient'
 import { ExpenseListClient } from './ExpenseListClient'
+import { ExportDataClient } from './ExportDataClient'
+import { ProfitEngineChart } from './ProfitEngineChart'
 import type { Expense } from '@/lib/types/finance'
 
 export default async function FinancesDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('firebase-session')?.value
+  if (!sessionToken) redirect('/login')
 
-  // if (!user) redirect('/login')
+  const decoded = await verifySessionCookie(sessionToken)
+  if (!decoded) redirect('/login')
 
-  // Fetch role
+  const supabase = createAdminClient()
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user?.id || '')
+    .eq('email', decoded.email)
     .single()
 
   if (profile?.role !== 'admin' && profile?.role !== 'manager') {
     redirect('/')
   }
 
-  // --- Fetch Financial Data ---
-  const { data: invoicesWithBusinesses } = await supabase
-    .from('invoices')
-    .select('*, businesses(name)')
+  const [invoicesRes, expensesRes, timesheetsRes] = await Promise.all([
+    supabase.from('invoices').select('*, businesses(name)'),
+    supabase.from('expenses').select('id, amount, category, description, expense_date, receipt_url, businesses(name)').order('expense_date', { ascending: false }),
+    supabase.from('contractor_timesheets').select('hours_logged, hourly_rate'),
+  ])
 
-  const invoices = invoicesWithBusinesses || []
+  const invoices = invoicesRes.data || []
+  const expenses = expensesRes.data || []
 
-  const totalIncome = (invoices || [])
-    .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + Number(inv.amount), 0)
-
-  const outstandingReceivables = (invoices || [])
-    .filter(inv => inv.status !== 'paid')
-    .reduce((sum, inv) => sum + Number(inv.amount), 0)
-
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('id, amount, category, description, expense_date, receipt_url, businesses(name)')
-    .order('expense_date', { ascending: false })
-
-  const fixedExpenses = (expenses || [])
-    .reduce((sum, exp) => sum + Number(exp.amount), 0)
-
-  const { data: timesheets } = await supabase
-    .from('contractor_timesheets')
-    .select('hours_logged, hourly_rate')
-
-  const contractorCosts = (timesheets || [])
-    .reduce((sum, ts) => sum + (Number(ts.hours_logged) * Number(ts.hourly_rate)), 0)
-
+  const totalIncome = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.amount), 0)
+  const outstandingReceivables = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + Number(i.amount), 0)
+  const fixedExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  const contractorCosts = (timesheetsRes.data || []).reduce((s, ts) => s + (Number(ts.hours_logged) * Number(ts.hourly_rate)), 0)
   const totalExpenses = fixedExpenses + contractorCosts
   const netProfit = totalIncome - totalExpenses
   const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0'
-
   const averageMonthlyExpenses = totalExpenses / 12 || 1
   const forecast30Days = outstandingReceivables - averageMonthlyExpenses
 
@@ -70,156 +56,132 @@ export default async function FinancesDashboard() {
     const monthRevenue = invoices
       .filter(inv => inv.status === 'paid' && new Date(inv.created_at || '').getMonth() === month.getMonth())
       .reduce((s, inv) => s + Number(inv.amount), 0)
-    const monthExpenses = (expenses || [])
+    const monthExpenses = expenses
       .filter(exp => new Date(exp.expense_date || '').getMonth() === month.getMonth())
       .reduce((s, exp) => s + Number(exp.amount), 0)
     return { month: monthStr, revenue: monthRevenue, expenses: monthExpenses, profit: monthRevenue - monthExpenses }
   })
 
   return (
-    <div className="animate-in delay-100">
-      
-      {/* Executive Financial Header */}
-      <div style={{ position: 'relative', height: '200px', borderRadius: '16px', marginBottom: '32px', overflow: 'hidden', border: '1px solid var(--surface-border)' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(0, 225, 255, 0.1) 100%)', zIndex: 0 }} />
-        <div style={{ position: 'absolute', inset: 0, padding: '40px 32px', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="flex flex-col gap-12 animate-in delay-100">
+
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground mb-1.5">Finances</h1>
+          <p className="text-muted-foreground text-sm">Agency-wide profitability, invoices, and expenses.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/finances/expenses/new"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.06] border border-white/[0.1] text-sm font-medium text-foreground hover:bg-white/[0.1] transition-colors"
+          >
+            <Plus size={15} /> Log Expense
+          </Link>
+          <Link
+            href="/finances/invoices/new"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Receipt size={15} /> New Invoice
+          </Link>
+        </div>
+      </div>
+
+      {/* STAT STRIP */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 pb-8 border-b border-white/[0.08]">
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <TrendingUp size={14} className="text-emerald-500" /> Gross Revenue
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">${totalIncome.toLocaleString()}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <TrendingDown size={14} className="text-red-400" /> Total Expenses
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">${totalExpenses.toLocaleString()}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <Activity size={14} className="text-blue-400" /> Net Margin
+          </span>
+          <span className={`text-3xl font-medium tracking-tight ${Number(profitMargin) >= 20 ? 'text-emerald-400' : 'text-foreground'}`}>{profitMargin}%</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <DollarSign size={14} className="text-amber-500" /> Receivables
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">${outstandingReceivables.toLocaleString()}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <Zap size={14} className="text-primary" /> 30d Forecast
+          </span>
+          <span className={`text-3xl font-medium tracking-tight ${forecast30Days >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            ${forecast30Days.toLocaleString()}
+          </span>
+        </div>
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+
+        {/* LEFT: Invoice List + Expense List */}
+        <div className="lg:col-span-2 flex flex-col gap-10">
+          <InvoiceListClient initialInvoices={invoices} />
+          <ExpenseListClient initialExpenses={expenses as Expense[]} />
+        </div>
+
+        {/* RIGHT: Chart + Burn composition + Export */}
+        <div className="flex flex-col gap-8">
+
+          {/* Profit Chart */}
           <div>
-            <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '16px', letterSpacing: '-0.02em' }}>
-              <Landmark size={32} color="var(--success)" /> Financial Command
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
-              Monitor agency-wide profitability, cashflow velocity, and tax-ready accounting.
-            </p>
+            <h2 className="text-lg font-medium mb-4 text-foreground/90">Profit Engine</h2>
+            <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl">
+              <ProfitEngineChart data={monthlyData} />
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Link href="/finances/invoices/new" className="btn btn-secondary" style={{ background: 'rgba(0,0,0,0.4)', borderColor: 'var(--surface-border)' }}>
-              <Receipt size={18} /> New Invoice
-            </Link>
-            <Link href="/finances/expenses/new" className="btn btn-primary" style={{ boxShadow: '0 4px 15px rgba(0,225,255,0.2)' }}>
-              <CreditCard size={18} /> Log Expense
-            </Link>
+
+          {/* Burn Composition */}
+          <div>
+            <h2 className="text-lg font-medium mb-4 text-foreground/90">Burn Composition</h2>
+            <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl flex flex-col gap-6">
+              {[
+                { label: 'Contractors', value: contractorCosts, color: 'bg-blue-500' },
+                { label: 'Tools & Overhead', value: fixedExpenses, color: 'bg-amber-500' },
+              ].map(item => (
+                <div key={item.label}>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">{item.label}</span>
+                    <span className="font-medium text-foreground">${item.value.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${item.color}`}
+                      style={{ width: totalExpenses > 0 ? `${(item.value / totalExpenses) * 100}%` : '0%' }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="pt-4 border-t border-white/[0.06] text-sm text-muted-foreground">
+                Targeting <strong className="text-foreground">35% margin</strong> · currently at{' '}
+                <strong className={Number(profitMargin) >= 35 ? 'text-emerald-400' : 'text-amber-400'}>{profitMargin}%</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Export */}
+          <div>
+            <h2 className="text-lg font-medium mb-4 text-foreground/90">Accounting Tools</h2>
+            <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl">
+              <p className="text-sm text-muted-foreground mb-4">Export records for tax preparation or internal auditing.</p>
+              <ExportDataClient invoices={invoices} expenses={expenses} />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Financial Pulse Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
-        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <TrendingUp size={12} color="var(--success)" /> Gross Revenue
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
-        </div>
-        
-        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <TrendingDown size={12} color="var(--error)" /> Burn Rate
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
-        </div>
-
-        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Activity size={12} color="var(--info)" /> Net Margin
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: Number(profitMargin) >= 20 ? 'var(--success)' : 'var(--text-primary)' }}>{profitMargin}%</div>
-        </div>
-
-        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <DollarSign size={12} color="var(--warning)" /> Receivables
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>${outstandingReceivables.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
-        </div>
-
-        <div className="glass-panel hover-card-biz" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Zap size={12} color="var(--accent-primary)" /> Forecast
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: forecast30Days >= 0 ? 'var(--success)' : 'var(--error)' }}>
-            ${forecast30Days.toLocaleString(undefined, { minimumFractionDigits: 0 })}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Financial Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
-        
-        {/* Left Column: Flow & Activity */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Chart Area */}
-          <div className="glass-panel" style={{ padding: '28px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '1.125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <PieChart size={18} color="var(--accent-primary)" /> Profit Engine
-              </h2>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', gap: '16px' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }} /> Revenue</div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--error)' }} /> Expenses</div>
-              </div>
-            </div>
-            <ProfitEngineChart data={monthlyData} />
-          </div>
-
-          {/* Receivables Kanban Integrated */}
-          <ReceivablesKanbanClient initialInvoices={invoicesWithBusinesses || []} />
-
-          <ExpenseListClient initialExpenses={(expenses || []) as Expense[]} />
-        </div>
-
-        {/* Right Column: Breakdown & Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'sticky', top: '24px' }}>
-          
-          {/* Category Breakdown */}
-          <div className="glass-panel" style={{ padding: '28px' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '24px' }}>Burn Composition</h2>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>External Contractors</span>
-                  <span style={{ fontWeight: 600 }}>${contractorCosts.toLocaleString()}</span>
-                </div>
-                <div style={{ height: '8px', background: 'var(--surface-border)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: totalExpenses > 0 ? `${(contractorCosts / totalExpenses) * 100}%` : '0%', background: 'var(--info)', borderRadius: '4px' }} />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tools & Overhead</span>
-                  <span style={{ fontWeight: 600 }}>${fixedExpenses.toLocaleString()}</span>
-                </div>
-                <div style={{ height: '8px', background: 'var(--surface-border)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: totalExpenses > 0 ? `${(fixedExpenses / totalExpenses) * 100}%` : '0%', background: 'var(--warning)', borderRadius: '4px' }} />
-                </div>
-              </div>
-            </div>
-            
-            <div style={{ marginTop: '32px', padding: '20px', background: 'rgba(0, 225, 255, 0.03)', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <Target size={16} color="var(--accent-primary)" />
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Profit Goal</span>
-              </div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0' }}>
-                Targeting a <strong style={{ color: 'var(--text-primary)' }}>35% margin</strong>. You are currently at <strong style={{ color: Number(profitMargin) >= 35 ? 'var(--success)' : 'var(--warning)' }}>{profitMargin}%</strong>.
-              </p>
-            </div>
-          </div>
-
-          {/* Export & Actions */}
-          <div className="glass-panel" style={{ padding: '28px' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>Accounting Tools</h2>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', marginBottom: '20px', lineHeight: 1.5 }}>
-              Export financial records for your tax preparation or internal auditing.
-            </p>
-            <ExportDataClient invoices={invoices} expenses={expenses || []} />
-          </div>
-
-        </div>
-
-      </div>
     </div>
   )
 }

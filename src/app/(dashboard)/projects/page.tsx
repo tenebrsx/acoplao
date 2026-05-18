@@ -1,51 +1,40 @@
-import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { verifySessionCookie } from '@/lib/firebase-admin'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { ProjectsDashboardClient } from './ProjectsDashboardClient'
 
 export default async function ProjectsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('firebase-session')?.value
+  if (!sessionToken) redirect('/login')
 
-  let role = 'admin'
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user?.id || '')
-      .single()
-    role = profile?.role || 'admin'
-  }
+  const decoded = await verifySessionCookie(sessionToken)
+  if (!decoded) redirect('/login')
 
-  const { data: businesses } = await supabase
-    .from('businesses')
-    .select('id, name')
-    .order('name')
+  const supabase = createAdminClient()
 
-  const { data: projects } = await supabase
-    .from('projects')
-    .select('*, businesses(name), deliverables(id, status_v2), project_phases(id, is_completed)')
-    .order('created_at', { ascending: false })
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('email', decoded.email)
+    .single()
+  const role = profile?.role || 'admin'
 
-  const { data: favorites } = await supabase
-    .from('user_favorites')
-    .select('entity_id')
-    .eq('user_id', user?.id || '')
-    .eq('entity_type', 'project')
-
-  const favoriteIds = (favorites || []).map(f => f.entity_id)
-
-  const { data: blueprints } = await supabase
-    .from('campaign_blueprints')
-    .select('*, blueprint_deliverables(*)')
-    .order('name')
+  const [businessesRes, projectsRes, blueprintsRes] = await Promise.all([
+    supabase.from('businesses').select('id, name').order('name'),
+    supabase.from('projects').select('*, businesses(name), deliverables(id, status_v2), project_phases(id, is_completed)').order('created_at', { ascending: false }),
+    supabase.from('campaign_blueprints').select('*, blueprint_deliverables(*)').order('name'),
+  ])
 
   return (
     <div className="animate-in delay-100">
       <ProjectsDashboardClient 
-        initialProjects={projects || []} 
-        businesses={businesses || []} 
+        initialProjects={projectsRes.data || []} 
+        businesses={businessesRes.data || []} 
         role={role} 
-        favoriteIds={favoriteIds}
-        blueprints={blueprints || []}
+        favoriteIds={[]}
+        blueprints={blueprintsRes.data || []}
       />
     </div>
   )

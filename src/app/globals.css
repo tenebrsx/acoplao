@@ -4,44 +4,42 @@
 
 @layer base {
   :root {
-    /* Forest Green Agency Theme */
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 100%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
     --primary: 142 76% 36%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 11%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 11%;
-    --muted-foreground: 0 0% 60%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
     --accent: 142 76% 36%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 17%;
-    --input: 0 0% 17%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
     --ring: 142 76% 36%;
     --radius: 0.625rem;
-    
-    /* Legacy tokens for compatibility */
-    --bg-primary: #000000;
-    --bg-secondary: #000000;
-    --bg-tertiary: #1c1c1e;
-    --bg-elevated: #2c2c2e;
-    --surface: #121212;
-    --surface-hover: #1c1c1e;
-    --surface-border: #2c2c2e;
-    --surface-border-hover: #3a3a3c;
-    --glass-bg: rgba(18, 18, 18, 0.8);
-    --glass-border: #2c2c2e;
+
+    --bg-primary: #ffffff;
+    --bg-secondary: #fafafa;
+    --bg-tertiary: #f4f4f5;
+    --bg-elevated: #ffffff;
+    --surface: #ffffff;
+    --surface-hover: #f4f4f5;
+    --surface-border: #e4e4e7;
+    --surface-border-hover: #d4d4d8;
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: #e4e4e7;
     --glass-blur: 20px;
-    --text-primary: #ffffff;
-    --text-secondary: #98989d;
-    --text-tertiary: #636366;
-    --text-inverse: #000000;
+    --text-primary: #09090b;
+    --text-secondary: #52525b;
+    --text-tertiary: #a1a1aa;
+    --text-inverse: #ffffff;
     --accent-primary: #22c55e;
     --accent-hover: #16a34a;
     --accent-secondary: #0a84ff;
@@ -54,12 +52,56 @@
     --radius-lg: 14px;
     --radius-xl: 20px;
     --radius-full: 9999px;
-    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
     --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --duration-fast: 150ms;
     --duration-base: 250ms;
     --duration-slow: 400ms;
+  }
+
+  .dark {
+    --background: 240 6% 5%;
+    --foreground: 0 0% 100%;
+    --card: 240 5% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 5% 8%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 142 76% 36%;
+
+    --bg-primary: #0c0c0e;
+    --bg-secondary: #0c0c0e;
+    --bg-tertiary: #141416;
+    --bg-elevated: #1c1c1f;
+    --surface: #141416;
+    --surface-hover: #1c1c1f;
+    --surface-border: #27272a;
+    --surface-border-hover: #3f3f46;
+    --glass-bg: rgba(12, 12, 14, 0.85);
+    --glass-border: #27272a;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #71717a;
+    --text-inverse: #09090b;
+    --accent-primary: #22c55e;
+    --accent-hover: #16a34a;
+    --accent-secondary: #0a84ff;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #0a84ff;
   }
 }
 
@@ -73,7 +115,6 @@
   }
 }
 
-/* ===== RESET ===== */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -124,7 +165,6 @@ input::placeholder, textarea::placeholder {
   color: var(--text-tertiary);
 }
 
-/* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -137,14 +177,12 @@ input::placeholder, textarea::placeholder {
 .delay-100 { animation-delay: 50ms; }
 .delay-200 { animation-delay: 100ms; }
 
-/* ===== UTILITIES ===== */
 .glass-panel {
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-md);
 }
 
-/* ===== CMDK COMMAND PALETTE ===== */
 .cmdk-overlay {
   position: fixed;
   inset: 0;
@@ -246,7 +284,6 @@ input::placeholder, textarea::placeholder {
   transform: translateY(-2px);
 }
 
-/* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .finance-layout {
     grid-template-columns: 1fr !important;

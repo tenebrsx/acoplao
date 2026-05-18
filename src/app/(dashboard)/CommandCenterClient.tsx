@@ -4,35 +4,29 @@ import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import {
-  DollarSign, CheckCircle2, Circle, Plus, FolderKanban, Building2,
-  Calendar, Activity, LayoutGrid, Bell, AlertTriangle, Clock,
-  TrendingUp, TrendingDown, Briefcase, Users, Zap, ArrowRight
+  FolderKanban, CheckCircle2, Circle, Plus,
+  ArrowUpRight, Users, Layers, ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import {
+  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO
+} from 'date-fns'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { formatDistanceToNow } from 'date-fns'
+import { Button } from '@/components/ui/button'
 
 type DashboardData = {
-  invoices: any[]
-  expenses: any[]
   projects: any[]
   phases: any[]
-  activity: any[]
-  notifications: any[]
   events: any[]
-  businesses: any[]
   tasks: any[]
   userName: string
+  userEmail: string
   role: string
   healthDistribution: { on_track: number; waiting_client: number; waiting_team: number; blocked: number }
-  overduePhases: number
-  outstandingReceivables: number
-  monthlyRevenue: number
-  unreadNotifications: number
+  clients: number
+  activeDeliverables: number
+  activeProjects: number
+  totalProjects: number
 }
 
 export function CommandCenterClient({ data }: { data: DashboardData }) {
@@ -40,12 +34,16 @@ export function CommandCenterClient({ data }: { data: DashboardData }) {
   const [tasks, setTasks] = useState(data.tasks)
   const [newTask, setNewTask] = useState('')
 
-  const activeProjects = data.projects.filter((p: any) => p.status === 'active').length
-  const totalProjects = data.projects.length
+  const greeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
 
-  const upcomingItems: { id: string; title: string; subtitle: string; date: Date; type: string }[] = []
-  data.phases.slice(0, 6).forEach((p: any) => {
-    upcomingItems.push({
+  const allCalendarItems: { id: string; title: string; subtitle: string; date: Date; type: string }[] = []
+  data.phases.forEach((p: any) => {
+    allCalendarItems.push({
       id: `phase-${p.id}`,
       title: p.phase_name,
       subtitle: p.projects?.title || 'Unknown Project',
@@ -53,20 +51,20 @@ export function CommandCenterClient({ data }: { data: DashboardData }) {
       type: 'phase'
     })
   })
-  data.events?.slice(0, 4).forEach((e: any) => {
-    upcomingItems.push({
+  data.events.forEach((e: any) => {
+    allCalendarItems.push({
       id: `event-${e.id}`,
       title: e.title,
-      subtitle: 'Calendar Event',
+      subtitle: 'Event',
       date: new Date(e.start_time),
       type: 'event'
     })
   })
 
-  const sortedAgenda = upcomingItems
+  const sortedAgenda = allCalendarItems
     .filter(item => item.date >= new Date(new Date().setHours(0, 0, 0, 0)))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, 6)
+    .slice(0, 5)
 
   const toggleTask = async (id: string, current: boolean) => {
     const newStatus = current ? 'todo' : 'done'
@@ -77,162 +75,111 @@ export function CommandCenterClient({ data }: { data: DashboardData }) {
     }).eq('id', id)
   }
 
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+
   const addTask = async () => {
     if (!newTask.trim()) return
-    const { data: userData } = await supabase.auth.getUser()
     const { data: row } = await supabase.from('tasks').insert({
       title: newTask,
       status: 'todo',
-      user_id: userData.user?.id,
+      user_email: data.userEmail,
       priority: 'medium'
     }).select('*').single()
     if (row) setTasks(prev => [row, ...prev])
     setNewTask('')
   }
 
-  const greeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return 'Good Morning'
-    if (h < 18) return 'Good Afternoon'
-    return 'Good Evening'
+  // Mini Calendar Logic
+  const monthStart = startOfMonth(currentMonth)
+  const monthEnd = endOfMonth(monthStart)
+  const startDate = startOfWeek(monthStart)
+  const endDate = endOfWeek(monthEnd)
+  
+  const calendarDays = []
+  let currentDay = startDate
+  while (currentDay <= endDate) {
+    calendarDays.push(currentDay)
+    currentDay = addDays(currentDay, 1)
   }
 
-  const alerts = []
-  if (data.overduePhases > 0) alerts.push({ type: 'warning', message: `${data.overduePhases} overdue phase${data.overduePhases > 1 ? 's' : ''}`, icon: AlertTriangle, href: '/projects' })
-  if (data.healthDistribution.blocked > 0) alerts.push({ type: 'error', message: `${data.healthDistribution.blocked} blocked project${data.healthDistribution.blocked > 1 ? 's' : ''}`, icon: AlertTriangle, href: '/projects' })
-  if (data.outstandingReceivables > 0) alerts.push({ type: 'info', message: `$${data.outstandingReceivables.toLocaleString()} outstanding`, icon: DollarSign, href: '/finances' })
-  if (data.unreadNotifications > 0) alerts.push({ type: 'default', message: `${data.unreadNotifications} unread notification${data.unreadNotifications > 1 ? 's' : ''}`, icon: Bell, href: '/inbox' })
-
   return (
-    <div className="flex flex-col gap-8 animate-in delay-100">
-
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+    <div className="flex flex-col gap-12">
+      
+      {/* HEADER & TOP STATS - NO BORDERS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-1">
-            {greeting()}, {data.userName}
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground mb-1.5">
+            {greeting()}, {data.userName}.
           </h1>
-          <p className="text-muted-foreground">
-            {activeProjects} active · {totalProjects} total projects
+          <p className="text-muted-foreground text-sm flex items-center gap-2">
+            Here's what's happening across your agency today.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/inbox"><Bell size={14} className="mr-1.5" /> Inbox</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/projects?action=new-project"><Plus size={14} className="mr-1.5" /> New Project</Link>
-          </Button>
+        
+        <div className="flex gap-3">
+           <Button variant="outline" className="rounded-full bg-background/50 backdrop-blur border-white/10" asChild>
+             <Link href="/projects"><FolderKanban size={16} className="mr-2 text-muted-foreground" /> Projects</Link>
+           </Button>
+           <Button className="rounded-full" asChild>
+             <Link href="/projects?action=new-project"><Plus size={16} className="mr-2" /> New Project</Link>
+           </Button>
         </div>
       </div>
 
-      {alerts.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {alerts.map((alert, i) => (
-            <Link
-              key={i}
-              href={alert.href}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                alert.type === 'error' ? 'bg-red-500/5 border-red-500/20 text-red-600 hover:bg-red-500/10' :
-                alert.type === 'warning' ? 'bg-amber-500/5 border-amber-500/20 text-amber-600 hover:bg-amber-500/10' :
-                alert.type === 'info' ? 'bg-blue-500/5 border-blue-500/20 text-blue-600 hover:bg-blue-500/10' :
-                'bg-secondary border-border text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <alert.icon size={14} />
-              {alert.message}
-            </Link>
-          ))}
+      {/* MINIMAL STRIP OF STATS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 pb-8 border-b border-white/[0.08]">
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5"><FolderKanban size={14} /> Active Projects</span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{data.activeProjects}</span>
         </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Projects</span>
-              <FolderKanban size={16} className="text-primary" />
-            </div>
-            <div className="text-2xl font-bold">{activeProjects}</div>
-            <div className="text-xs text-muted-foreground">of {totalProjects} total</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Monthly Revenue</span>
-              <TrendingUp size={16} className="text-emerald-500" />
-            </div>
-            <div className="text-2xl font-bold">${data.monthlyRevenue.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground">this month</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Outstanding</span>
-              <TrendingDown size={16} className="text-amber-500" />
-            </div>
-            <div className="text-2xl font-bold">${data.outstandingReceivables.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground">in receivables</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">My Tasks</span>
-              <CheckCircle2 size={16} className="text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold">{tasks.length}</div>
-            <div className="text-xs text-muted-foreground">due this week</div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5"><Users size={14} className="text-emerald-500" /> Clients</span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{data.clients}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5"><Layers size={14} className="text-amber-500" /> Active Deliverables</span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{data.activeDeliverables}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5"><CheckCircle2 size={14} className="text-blue-500" /> Pending Tasks</span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{tasks.filter(t => t.status !== 'done').length}</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity size={16} className="text-primary" /> Project Health
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/projects" className="text-xs">View All</Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'On Track', count: data.healthDistribution.on_track, color: 'bg-emerald-500', text: 'text-emerald-600' },
-                  { label: 'Waiting Client', count: data.healthDistribution.waiting_client, color: 'bg-amber-500', text: 'text-amber-600' },
-                  { label: 'Waiting Team', count: data.healthDistribution.waiting_team, color: 'bg-blue-500', text: 'text-blue-600' },
-                  { label: 'Blocked', count: data.healthDistribution.blocked, color: 'bg-red-500', text: 'text-red-600' }
-                ].map(h => (
-                  <div key={h.label} className="p-3 rounded-lg border bg-card text-center">
-                    <div className={`text-2xl font-bold ${h.text}`}>{h.count}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{h.label}</div>
-                    <div className={`h-1 rounded-full mt-2 ${h.color} opacity-20`}>
-                      <div className={`h-full rounded-full ${h.color}`} style={{ width: totalProjects > 0 ? `${(h.count / totalProjects) * 100}%` : '0%' }} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        
+        {/* MAIN COLUMN */}
+        <div className="lg:col-span-2 space-y-10">
+          
+          {/* HEALTH DISTRIBUTION - GLASSMORPHIC */}
+          <div>
+             <h2 className="text-lg font-medium mb-4 flex items-center gap-2 text-foreground/90">Project Health</h2>
+             <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-8 backdrop-blur-xl shadow-2xl">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                  {[
+                    { label: 'On Track', count: data.healthDistribution.on_track, text: 'text-emerald-400' },
+                    { label: 'Wait Client', count: data.healthDistribution.waiting_client, text: 'text-amber-400' },
+                    { label: 'Wait Team', count: data.healthDistribution.waiting_team, text: 'text-blue-400' },
+                    { label: 'Blocked', count: data.healthDistribution.blocked, text: 'text-red-400' }
+                  ].map(h => (
+                    <div key={h.label} className="flex flex-col items-center">
+                      <div className={`text-4xl font-light tracking-tight mb-2 ${h.count > 0 ? h.text : 'text-muted-foreground/30'}`}>{h.count}</div>
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{h.label}</div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+             </div>
+          </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Zap size={18} className="text-primary" /> Production Pulse
-              </h2>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/projects" className="text-xs">View All Projects</Link>
-              </Button>
+          {/* PRODUCTION PULSE */}
+          <div>
+            <div className="flex justify-between items-end mb-4">
+               <h2 className="text-lg font-medium flex items-center gap-2 text-foreground/90">Production Pulse</h2>
+               <Link href="/projects" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">View All <ArrowUpRight size={14} /></Link>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {data.projects.slice(0, 4).map((p: any) => {
+            
+            <div className="flex flex-col gap-3">
+              {data.projects.slice(0, 5).map((p: any) => {
                 const phases = p.project_phases || []
                 const done = phases.filter((ph: any) => ph.is_completed).length
                 const progress = phases.length > 0 ? Math.round((done / phases.length) * 100) : 0
@@ -240,159 +187,140 @@ export function CommandCenterClient({ data }: { data: DashboardData }) {
                 const isWaiting = p.bottleneck_status === 'waiting_client' || p.bottleneck_status === 'waiting_team'
 
                 return (
-                  <Link key={p.id} href={`/projects/${p.id}`} className="block">
-                    <Card className={`h-full border-border/50 hover:border-primary/50 hover:-translate-y-0.5 transition-all cursor-pointer ${isBlocked ? 'border-red-500/30' : isWaiting ? 'border-amber-500/30' : ''}`}>
-                      <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="min-w-0">
-                            <div className="font-semibold text-sm truncate">{p.title}</div>
-                            <div className="text-xs text-muted-foreground">{p.businesses?.name}</div>
-                          </div>
-                          <Badge variant="outline" className={`text-[10px] h-5 ${
-                            p.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                            p.status === 'paused' ? 'bg-amber-500/10 text-amber-500' :
-                            'bg-muted'
-                          }`}>
-                            {p.status}
-                          </Badge>
-                        </div>
-                        <Progress value={progress} className="h-1.5 mb-2" />
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{done} / {phases.length} phases</span>
-                          <span className="font-medium">{progress}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
+                  <Link key={p.id} href={`/projects/${p.id}`} className="group relative overflow-hidden bg-[#141416]/50 hover:bg-[#1c1c1f]/80 border border-white/[0.06] hover:border-white/[0.12] transition-all rounded-xl p-4 flex items-center gap-4 shadow-sm">
+                     <div className={`w-1 h-full absolute left-0 top-0 bottom-0 ${isBlocked ? 'bg-red-500' : isWaiting ? 'bg-amber-500' : 'bg-primary/50'}`} />
+                     <div className="flex-1 min-w-0 pl-2">
+                       <div className="flex items-center gap-2 mb-1.5">
+                         <span className="font-medium text-foreground truncate">{p.title}</span>
+                         {p.businesses?.name && <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.05]">{p.businesses.name}</span>}
+                       </div>
+                       <div className="text-xs text-muted-foreground flex items-center gap-3">
+                         <span className="font-medium">{done}/{phases.length} Phases</span>
+                         <div className="flex-1 max-w-[140px] h-1.5 bg-black/40 rounded-full overflow-hidden">
+                           <div className={`h-full rounded-full ${isBlocked ? 'bg-red-500' : isWaiting ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${progress}%` }} />
+                         </div>
+                       </div>
+                     </div>
+                     <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <ArrowUpRight size={16} className="text-muted-foreground" />
+                     </div>
                   </Link>
                 )
               })}
+              {data.projects.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground text-sm border border-dashed border-white/10 rounded-xl bg-white/[0.01]">
+                  No active projects right now.
+                </div>
+              )}
             </div>
           </div>
+
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar size={16} className="text-blue-500" /> Upcoming
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/calendar" className="text-xs">Calendar</Link>
-                </Button>
+        {/* RIGHT COLUMN - SLIM AND COMPACT */}
+        <div className="space-y-10">
+          
+          {/* MINI CALENDAR */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium flex items-center gap-2 text-foreground/90">Calendar</h2>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft size={14} /></Button>
+                <span className="text-sm font-medium w-24 text-center">{format(currentMonth, 'MMM yyyy')}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight size={14} /></Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            </div>
+            <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-5 backdrop-blur-xl shadow-lg">
+              <div className="grid grid-cols-7 mb-2">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                  <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-y-2 gap-x-1">
+                {calendarDays.map((day, i) => {
+                  const dayEvents = allCalendarItems.filter(item => isSameDay(item.date, day))
+                  const isCurrentMonth = isSameMonth(day, currentMonth)
+                  const isToday = isSameDay(day, new Date())
+                  
+                  return (
+                    <div key={i} className="flex flex-col items-center justify-start h-8">
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs transition-colors ${
+                        isToday ? 'bg-primary text-primary-foreground font-bold' :
+                        !isCurrentMonth ? 'text-muted-foreground/30' :
+                        'text-foreground hover:bg-white/[0.05]'
+                      }`}>
+                        {format(day, 'd')}
+                      </div>
+                      <div className="flex gap-0.5 mt-0.5 h-1">
+                        {dayEvents.slice(0, 3).map((ev, ei) => (
+                          <div key={ei} className={`w-1 h-1 rounded-full ${ev.type === 'phase' ? 'bg-primary' : 'bg-cyan-400'}`} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* UPCOMING AGENDA */}
+          <div>
+            <h2 className="text-lg font-medium mb-4 flex items-center gap-2 text-foreground/90">Agenda</h2>
+            <div className="bg-[#141416]/50 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl shadow-lg">
+              <div className="flex flex-col gap-5">
                 {sortedAgenda.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No upcoming events.</p>
+                   <p className="text-sm text-muted-foreground py-2">Your schedule is clear.</p>
                 )}
                 {sortedAgenda.map(item => (
-                  <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/50 border border-border">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      item.type === 'phase' ? 'bg-primary/10 text-primary' : 'bg-blue-500/10 text-blue-500'
-                    }`}>
-                      {item.type === 'phase' ? <Briefcase size={14} /> : <Calendar size={14} />}
+                  <div key={item.id} className="flex gap-4 items-start group">
+                    <div className="w-10 text-center shrink-0 pt-0.5">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider">{item.date.toLocaleDateString(undefined, { month: 'short' })}</div>
+                      <div className="text-xl font-light text-foreground">{item.date.getDate()}</div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{item.title}</div>
-                      <div className="text-xs text-muted-foreground">{item.subtitle}</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground shrink-0">
-                      {item.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="text-sm font-medium text-foreground/90 group-hover:text-foreground transition-colors truncate">{item.title}</div>
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">{item.subtitle}</div>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-blue-500" /> My Tasks
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/tasks" className="text-xs">All Tasks</Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-3">
-                {tasks.slice(0, 5).map(t => (
-                  <div key={t.id} className="flex items-center gap-2.5 group">
-                    <button onClick={() => toggleTask(t.id, t.status === 'done')} className="shrink-0">
+          {/* TASKS */}
+          <div>
+             <h2 className="text-lg font-medium mb-4 flex items-center gap-2 text-foreground/90">My Tasks</h2>
+             <div className="flex flex-col gap-1.5">
+               {tasks.slice(0, 6).map(t => (
+                 <div key={t.id} className="flex items-start gap-3 p-2.5 hover:bg-white/[0.03] rounded-lg transition-colors group">
+                    <button onClick={() => toggleTask(t.id, t.status === 'done')} className="shrink-0 mt-0.5 focus:outline-none">
                       {t.status === 'done' ? (
                         <CheckCircle2 size={16} className="text-emerald-500" />
                       ) : (
-                        <Circle size={16} className="text-muted-foreground hover:text-primary transition-colors" />
+                        <Circle size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
                       )}
                     </button>
-                    <span className={`text-sm flex-1 truncate ${t.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+                    <span className={`text-sm flex-1 leading-snug ${t.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground/90'}`}>
                       {t.title}
                     </span>
-                    {t.priority === 'urgent' && <Badge variant="destructive" className="text-[10px] h-4">Urgent</Badge>}
-                    {t.priority === 'high' && <Badge variant="default" className="text-[10px] h-4">High</Badge>}
-                  </div>
-                ))}
-                {tasks.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-2">No pending tasks.</p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newTask}
-                  onChange={e => setNewTask(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addTask()}
-                  placeholder="Add a task..."
-                  className="flex-1 text-sm h-8"
-                />
-                <Button size="icon" className="h-8 w-8" onClick={addTask}><Plus size={14} /></Button>
-              </div>
-            </CardContent>
-          </Card>
+                 </div>
+               ))}
+               
+               <div className="flex items-center gap-2 mt-2 px-2.5">
+                 <Plus size={14} className="text-muted-foreground shrink-0" />
+                 <Input 
+                   placeholder="Add a new task..." 
+                   className="h-8 text-sm bg-transparent border-0 border-b border-white/10 rounded-none px-1 focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/40 shadow-none"
+                   value={newTask}
+                   onChange={e => setNewTask(e.target.value)}
+                   onKeyDown={e => e.key === 'Enter' && addTask()}
+                 />
+               </div>
+             </div>
+          </div>
 
-          {data.activity.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity size={16} className="text-primary" /> Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {data.activity.slice(0, 5).map((act: any) => (
-                    <div key={act.id} className="flex items-start gap-3">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-[10px] bg-secondary">
-                          {act.profiles?.email?.charAt(0).toUpperCase() || 'S'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm">
-                          <span className="font-medium">{act.profiles?.email?.split('@')[0] || 'System'}</span>
-                          {' '}
-                          <span className="text-muted-foreground">
-                            {act.action === 'asset_created' ? 'created' :
-                             act.action === 'status_change' ? 'updated' :
-                             act.action === 'phase_completed' ? 'completed' :
-                             act.action === 'broadcast_sent' ? 'sent broadcast for' : 'updated'}
-                            {' '}
-                            {act.target_name}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
+
       </div>
     </div>
   )

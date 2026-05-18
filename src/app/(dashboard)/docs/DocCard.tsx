@@ -1,24 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, Globe, Lock, Calendar, Tag } from 'lucide-react'
+import { Globe, Lock, Calendar, Tag, FolderOpen } from 'lucide-react'
 import { DocActions } from './DocActions'
 import { FavoriteButton } from '@/components/FavoriteButton'
 
-export function DocCard({ doc, isFavorite }: { doc: any, isFavorite?: boolean }) {
+export function DocCard({ doc, isFavorite, childCount = 0 }: { doc: any, isFavorite?: boolean, childCount?: number }) {
   const creatorInitial = doc.profiles?.email?.charAt(0).toUpperCase() || '?'
+  const docIcon = doc.icon && doc.icon !== 'page' ? doc.icon : '📄'
 
   return (
-    <Link 
+    <Link
       href={`/docs/${doc.id}`}
       className="glass-panel"
-      style={{ 
-        padding: '20px', 
-        textDecoration: 'none', 
-        color: 'inherit', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        height: '100%', 
+      style={{
+        padding: '20px',
+        textDecoration: 'none',
+        color: 'inherit',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
         transition: 'all 0.2s ease',
         position: 'relative',
         border: '1px solid var(--surface-border)',
@@ -37,8 +38,8 @@ export function DocCard({ doc, isFavorite }: { doc: any, isFavorite?: boolean })
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--surface-border)' }}>
-            <FileText size={20} color="var(--text-secondary)" />
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--surface-border)', fontSize: '1.25rem' }}>
+            {docIcon}
           </div>
           <FavoriteButton entityId={doc.id} entityType="document" initialIsFavorite={isFavorite} />
         </div>
@@ -79,6 +80,11 @@ export function DocCard({ doc, isFavorite }: { doc: any, isFavorite?: boolean })
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {childCount > 0 && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <FolderOpen size={12} /> {childCount}
+            </span>
+          )}
           {doc.is_public ? (
             <div title="Public" style={{ color: 'var(--success)', opacity: 0.8 }}>
               <Globe size={14} />

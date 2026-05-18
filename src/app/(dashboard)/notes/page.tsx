@@ -4,18 +4,19 @@ import { NotesClient } from './NotesClient'
 export default async function NotesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id || ''
 
   const { data: notes } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('user_id', user?.id || '')
+    .from('upnote_notes')
+    .select('*, upnote_note_tags(tag_id)')
+    .eq('user_id', userId)
     .eq('is_archived', false)
     .order('is_pinned', { ascending: false })
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
 
   return (
     <div className="animate-in delay-100">
-      <NotesClient initialNotes={notes || []} userId={user?.id || ''} />
+      <NotesClient initialNotes={notes || []} userId={userId} />
     </div>
   )
 }

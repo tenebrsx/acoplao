@@ -1,6 +1,7 @@
 'use client'
 
 import { useEditor, EditorContent } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
@@ -27,12 +28,19 @@ import {
   Quote, Code, Minus, Undo, Redo,
   Highlighter, Type, Palette,
 } from 'lucide-react'
+import { Callout } from './tiptap/Callout'
+import { CollectionBlock } from './tiptap/CollectionBlock'
+import { EmbedBlock } from './tiptap/EmbedBlock'
+import { SlashCommandExtension } from './tiptap/SlashCommand'
+import { BlockAddButtonExtension } from './tiptap/BlockAddButton'
+import { BlockMenuExtension } from './tiptap/BlockMenu'
+import { BlockContextMenu } from './BlockContextMenu'
 
 import './editor.css'
 
 type TiptapEditorProps = {
   content: any
-  onUpdate: (content: any, wordCount: number) => void
+  onUpdate: (content: any, wordCount: number, plainText: string) => void
   editable?: boolean
 }
 
@@ -53,7 +61,7 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
         HTMLAttributes: { class: 'editor-image' },
       }),
       Placeholder.configure({
-        placeholder: 'Start writing...',
+        placeholder: "Press '/' for commands",
       }),
       Underline,
       TextAlign.configure({
@@ -68,6 +76,18 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
       TableHeader,
       TaskList,
       TaskItem.configure({ nested: true }),
+      Callout,
+      CollectionBlock,
+      EmbedBlock,
+      SlashCommandExtension,
+      BlockAddButtonExtension,
+      BlockMenuExtension.configure({
+        onMenuOpen: (pos: number, node: any, rect: DOMRect) => {
+          window.dispatchEvent(new CustomEvent('open-block-menu', {
+            detail: { pos, node, rect }
+          }))
+        }
+      }),
     ],
     content: content || '<p></p>',
     editable,
@@ -77,7 +97,7 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
         const json = editor.getJSON()
         const text = editor.getText()
         const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0
-        onUpdate(json, wordCount)
+        onUpdate(json, wordCount, text)
       }, 500)
     },
     editorProps: {
@@ -132,112 +152,34 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
 
   return (
     <div className="tiptap-wrapper">
-      {/* Toolbar */}
-      {editable && (
-        <div className="toolbar">
-          <div className="toolbar-group">
-            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo">
-              <Undo size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo">
-              <Redo size={16} />
-            </ToolbarButton>
-          </div>
+      <EditorContent editor={editor} />
 
-          <div className="toolbar-divider" />
+      <BlockContextMenu editor={editor} />
 
-          <div className="toolbar-group">
-            <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Heading 1">
-              <Heading1 size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading 2">
-              <Heading2 size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading 3">
-              <Heading3 size={16} />
-            </ToolbarButton>
-          </div>
-
-          <div className="toolbar-divider" />
-
+      {editable && editor && (
+        <BubbleMenu editor={editor} className="bubble-menu">
           <div className="toolbar-group">
             <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold">
-              <Bold size={16} />
+              <Bold size={14} />
             </ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic">
-              <Italic size={16} />
+              <Italic size={14} />
             </ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline">
-              <UnderlineIcon size={16} />
+              <UnderlineIcon size={14} />
             </ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough">
-              <Strikethrough size={16} />
+              <Strikethrough size={14} />
             </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} active={editor.isActive('highlight')} title="Highlight">
-              <Highlighter size={16} />
+            <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Code">
+              <Code size={14} />
             </ToolbarButton>
-          </div>
-
-          <div className="toolbar-divider" />
-
-          <div className="toolbar-group">
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align Left">
-              <AlignLeft size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Align Center">
-              <AlignCenter size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Align Right">
-              <AlignRight size={16} />
+            <ToolbarButton onClick={setLink} active={editor.isActive('link')} title="Link">
+              <LinkIcon size={14} />
             </ToolbarButton>
           </div>
-
-          <div className="toolbar-divider" />
-
-          <div className="toolbar-group">
-            <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet List">
-              <List size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered List">
-              <ListOrdered size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Task List">
-              <CheckSquare size={16} />
-            </ToolbarButton>
-          </div>
-
-          <div className="toolbar-divider" />
-
-          <div className="toolbar-group">
-            <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Quote">
-              <Quote size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code Block">
-              <Code size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider">
-              <Minus size={16} />
-            </ToolbarButton>
-          </div>
-
-          <div className="toolbar-divider" />
-
-          <div className="toolbar-group">
-            <ToolbarButton onClick={setLink} active={editor.isActive('link')} title="Insert Link">
-              <LinkIcon size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={addImage} title="Insert Image">
-              <ImageIcon size={16} />
-            </ToolbarButton>
-            <ToolbarButton onClick={addTable} title="Insert Table">
-              <TableIcon size={16} />
-            </ToolbarButton>
-          </div>
-        </div>
+        </BubbleMenu>
       )}
-
-      {/* Editor */}
-      <EditorContent editor={editor} />
     </div>
   )
 }

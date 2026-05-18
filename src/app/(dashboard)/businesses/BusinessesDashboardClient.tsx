@@ -2,37 +2,38 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { 
-  Building2, Plus, ArrowRight, Mail, 
-  User, Search, Activity, DollarSign, Star, X, LayoutTemplate, CheckCircle2, Loader2
+import {
+  Building2, Plus, Mail, User, Search, FolderKanban, PackageCheck,
+  ArrowUpRight, X, LayoutTemplate, CheckCircle2, Loader2, CircleDot
 } from 'lucide-react'
-import { FavoriteButton } from '@/components/FavoriteButton'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ToastProvider'
 
-export function BusinessesDashboardClient({ 
-  initialBusinesses, 
+export function BusinessesDashboardClient({
+  initialBusinesses,
   invoices,
   expenses,
-  createAction, // Keep for backward compat if needed
+  createAction,
   favoriteIds = [],
   blueprints = []
-}: { 
-  initialBusinesses: any[], 
-  invoices: any[],
-  expenses: any[],
-  createAction: any,
-  favoriteIds?: string[],
+}: {
+  initialBusinesses: any[]
+  invoices: any[]
+  expenses: any[]
+  createAction: any
+  favoriteIds?: string[]
   blueprints?: any[]
+  projects?: any[]
+  deliverables?: any[]
 }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isOnboarding, setIsOnboarding] = useState(false)
   const [newBizName, setNewBizName] = useState('')
   const [selectedBlueprints, setSelectedBlueprints] = useState<string[]>([])
   const [isCreating, setIsCreating] = useState(false)
-  
+
   const supabase = createClient()
   const router = useRouter()
   const { toast } = useToast()
@@ -40,296 +41,320 @@ export function BusinessesDashboardClient({
   const handleOnboard = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newBizName.trim()) return
-
     setIsCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
 
     try {
-      // 1. Create Business
       const { data: biz, error: bizErr } = await supabase
         .from('businesses')
-        .insert({
-          name: newBizName,
-          created_by: user?.id,
-        })
+        .insert({ name: newBizName, created_by: user?.id })
         .select('id')
         .single()
 
       if (bizErr || !biz) throw bizErr
 
-      // 2. Create Selected Blueprint Projects
       for (const bpId of selectedBlueprints) {
         const blueprint = blueprints.find(b => b.id === bpId)
         if (!blueprint) continue
 
         const { data: project, error: projErr } = await supabase
           .from('projects')
-          .insert({
-            title: blueprint.name,
-            business_id: biz.id,
-            status: 'active',
-            created_by: user?.id
-          })
+          .insert({ title: blueprint.name, business_id: biz.id, status: 'active', created_by: user?.id })
           .select('id')
           .single()
 
         if (!projErr && project) {
-          // Auto-member
           await supabase.from('project_members').insert({ project_id: project.id, user_id: user?.id })
-
-          // Create deliverables & phases
           if (blueprint.blueprint_deliverables) {
             for (const bDeliv of blueprint.blueprint_deliverables) {
               const { data: deliverable, error: delivErr } = await supabase
                 .from('deliverables')
-                .insert({
-                  project_id: project.id,
-                  title: bDeliv.title,
-                  status_v2: 'in_progress',
-                  type: bDeliv.type,
-                  created_by: user?.id
-                })
+                .insert({ project_id: project.id, title: bDeliv.title, status_v2: 'in_progress', type: bDeliv.type, created_by: user?.id })
                 .select('id')
                 .single()
 
               if (!delivErr && deliverable && Array.isArray(bDeliv.phases)) {
-                const phasesToInsert = bDeliv.phases.map((pName: string, idx: number) => ({
-                  deliverable_id: deliverable.id,
-                  phase_name: pName,
-                  sort_order: idx,
-                  is_completed: false
-                }))
-                await supabase.from('deliverable_phases').insert(phasesToInsert)
+                await supabase.from('deliverable_phases').insert(
+                  bDeliv.phases.map((pName: string, idx: number) => ({
+                    deliverable_id: deliverable.id, phase_name: pName, sort_order: idx, is_completed: false
+                  }))
+                )
               }
             }
           }
         }
       }
 
-      toast(`Onboarded ${newBizName} successfully!`, "success")
+      toast(`Onboarded ${newBizName} successfully!`, 'success')
       router.push(`/businesses/${biz.id}`)
     } catch (err) {
       console.error(err)
-      toast("Failed to onboard client", "error")
+      toast('Failed to onboard client', 'error')
       setIsCreating(false)
     }
   }
 
   const toggleBlueprint = (id: string) => {
-    setSelectedBlueprints(prev => 
+    setSelectedBlueprints(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     )
   }
 
   const filteredBusinesses = useMemo(() => {
     return initialBusinesses.filter(biz => {
-      const query = searchQuery.toLowerCase()
-      return biz.name.toLowerCase().includes(query) || 
-             biz.contact_name?.toLowerCase().includes(query) ||
-             biz.contact_email?.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase()
+      return biz.name.toLowerCase().includes(q) ||
+        biz.contact_name?.toLowerCase().includes(q) ||
+        biz.contact_email?.toLowerCase().includes(q)
     })
   }, [initialBusinesses, searchQuery])
 
+  // Aggregate cross-client stats — projects now include status + deliverables
+  const allProjects = initialBusinesses.flatMap((b: any) => b.projects || [])
+  const activeProjectCount = allProjects.filter((p: any) => p.status === 'active').length
+  const totalProjectCount = allProjects.length
+  const activeDeliverableCount = allProjects.reduce((acc: number, p: any) => {
+    return acc + (p.deliverables?.filter((d: any) =>
+      d.status_v2 !== 'approved' && d.status_v2 !== 'delivered' && d.status_v2 !== 'cancelled'
+    )?.length || 0)
+  }, 0)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="flex flex-col gap-12">
+
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '8px', letterSpacing: '-0.02em' }}>Clients & Basecamps</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>
-            Central operations for every brand and service in the agency.
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground mb-1.5">Clients</h1>
+          <p className="text-muted-foreground text-sm">
+            {initialBusinesses.length} client{initialBusinesses.length !== 1 ? 's' : ''} · central operations hub
           </p>
         </div>
-        <button onClick={() => setIsOnboarding(true)} className="btn btn-primary" style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 700 }}>
-          <Plus size={20} strokeWidth={3} /> Onboard New Client
+        <button
+          onClick={() => setIsOnboarding(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Plus size={15} /> Onboard Client
         </button>
       </div>
 
-      {/* Toolbar */}
-      <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-          <input 
-            type="text" 
-            placeholder="Search clients..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px 10px 40px',
-              borderRadius: '10px',
-              border: '1px solid var(--surface-border)',
-              background: 'var(--surface-hover)',
-              fontSize: '0.875rem',
-              outline: 'none'
-            }}
-          />
+      {/* SUMMARY STRIP */}
+      <div className="grid grid-cols-3 gap-8 pb-8 border-b border-white/[0.08]">
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <Building2 size={14} /> Total Clients
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{initialBusinesses.length}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <FolderKanban size={14} className="text-emerald-500" /> Active Projects
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{activeProjectCount}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <PackageCheck size={14} className="text-blue-400" /> Deliverables In Progress
+          </span>
+          <span className="text-3xl font-medium tracking-tight text-foreground">{activeDeliverableCount}</span>
         </div>
       </div>
 
-      {/* Grid */}
+      {/* SEARCH */}
+      <div className="relative max-w-sm">
+        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search clients..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 text-sm bg-white/[0.03] border border-white/[0.08] rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/20 transition-colors"
+        />
+      </div>
+
+      {/* CLIENT LIST */}
       {filteredBusinesses.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '64px 32px', textAlign: 'center' }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', border: '1px solid var(--surface-border)' }}>
-            <Building2 size={28} color="var(--text-tertiary)" />
-          </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>No Clients Found</h2>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
-            {searchQuery ? "No results matching your search." : "Register your first brand to get started."}
+        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+          <Building2 size={32} className="text-muted-foreground/30 mb-4" />
+          <p className="text-muted-foreground text-sm">
+            {searchQuery ? 'No clients match your search.' : 'No clients yet. Onboard your first one.'}
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
-          {filteredBusinesses.map((biz: any) => {
-            const bizInvoices = invoices.filter(i => i.business_id === biz.id)
-            const bizExpenses = expenses.filter(e => e.business_id === biz.id)
-            
-            const totalIncome = bizInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + Number(i.amount), 0)
-            const totalSpent = bizExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
-            
-            const contractValue = biz.total_contract_value || 0
-            const baselineValue = contractValue > 0 ? contractValue : (totalIncome > 0 ? totalIncome : 1)
-            const progress = Math.min((totalSpent / baselineValue) * 100, 100)
+        <div className="flex flex-col">
+          {/* List header */}
+          <div className="grid grid-cols-12 px-4 pb-2 text-[11px] uppercase tracking-wider text-muted-foreground/50 font-medium border-b border-white/[0.06]">
+            <span className="col-span-4">Client</span>
+            <span className="col-span-2">Contact</span>
+            <span className="col-span-2">Active Projects</span>
+            <span className="col-span-2">In Progress</span>
+            <span className="col-span-2 text-right">Health</span>
+          </div>
 
-            const healthColor = biz.health_status === 'red' ? 'var(--error)' : biz.health_status === 'yellow' ? 'var(--warning)' : 'var(--success)'
+          <AnimatePresence>
+            {filteredBusinesses.map((biz: any, i: number) => {
+              const bizProjects = biz.projects || []
+              const bizActiveProjects = bizProjects.filter((p: any) => p.status === 'active').length
+              const bizTotalProjects = bizProjects.length
+              const bizInProgressDeliverables = bizProjects.reduce((acc: number, p: any) => {
+                return acc + (p.deliverables?.filter((d: any) =>
+                  d.status_v2 !== 'approved' && d.status_v2 !== 'delivered' && d.status_v2 !== 'cancelled'
+                )?.length || 0)
+              }, 0)
+              const healthColor =
+                biz.health_status === 'red' ? 'text-red-400' :
+                biz.health_status === 'yellow' ? 'text-amber-400' :
+                'text-emerald-400'
 
-            return (
-              <Link
-                key={biz.id}
-                href={`/businesses/${biz.id}`}
-                className="glass-panel"
-                style={{ 
-                  padding: '24px', textDecoration: 'none', color: 'inherit', 
-                  display: 'flex', flexDirection: 'column', gap: '20px',
-                  transition: 'all 0.2s ease',
-                  border: '1px solid var(--surface-border)'
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.borderColor = 'var(--text-tertiary)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.borderColor = 'var(--surface-border)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--surface-border)', position: 'relative' }}>
-                      <Building2 size={20} color="var(--text-primary)" />
-                      <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '12px', height: '12px', borderRadius: '50%', background: healthColor, border: '2px solid var(--surface)' }} />
-                      <div style={{ position: 'absolute', top: '-8px', right: '-8px', zIndex: 5 }}>
-                        <FavoriteButton entityId={biz.id} entityType="business" initialIsFavorite={favoriteIds.includes(biz.id)} />
+              return (
+                <motion.div
+                  key={biz.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                >
+                  <Link
+                    href={`/businesses/${biz.id}`}
+                    className="group grid grid-cols-12 items-center px-4 py-4 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors"
+                  >
+                    {/* Client name */}
+                    <div className="col-span-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
+                        <Building2 size={14} className="text-muted-foreground" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{biz.name}</div>
+                        <div className="text-xs text-muted-foreground">{bizTotalProjects} project{bizTotalProjects !== 1 ? 's' : ''} total</div>
                       </div>
                     </div>
-                    <div>
-                      <h3 style={{ fontWeight: 600, fontSize: '1.125rem', marginBottom: '4px' }}>{biz.name}</h3>
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>
-                        <span>{biz.projects?.length || 0} active campaigns</span>
-                      </div>
+
+                    {/* Contact */}
+                    <div className="col-span-2">
+                      {biz.contact_name ? (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                          <User size={11} className="shrink-0" />
+                          <span className="truncate">{biz.contact_name}</span>
+                        </div>
+                      ) : biz.contact_email ? (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                          <Mail size={11} className="shrink-0" />
+                          <span className="truncate">{biz.contact_email}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/30">—</span>
+                      )}
                     </div>
-                  </div>
-                </div>
 
-                {(biz.contact_name || biz.contact_email) && (
-                  <div style={{ display: 'flex', gap: '16px', fontSize: '0.8125rem', color: 'var(--text-secondary)', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--surface-border)' }}>
-                    {biz.contact_name && <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><User size={14} color="var(--text-tertiary)" /> {biz.contact_name}</span>}
-                    {biz.contact_email && <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={14} color="var(--text-tertiary)" /> {biz.contact_email}</span>}
-                  </div>
-                )}
+                    {/* Active Projects */}
+                    <div className="col-span-2">
+                      {bizActiveProjects > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400">
+                          <FolderKanban size={13} />{bizActiveProjects} active
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">No active projects</span>
+                      )}
+                    </div>
 
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8125rem' }}>
-                    <span style={{ color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Expense Burn</span>
-                    <span style={{ fontWeight: 600, color: progress > 80 ? 'var(--error)' : 'var(--text-primary)' }}>
-                      ${totalSpent.toLocaleString()} / ${(contractValue > 0 ? contractValue : totalIncome).toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ height: '6px', background: 'var(--surface-border)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progress}%`, background: progress > 80 ? 'var(--error)' : 'var(--accent-primary)', borderRadius: '3px' }} />
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
+                    {/* In-Progress Deliverables */}
+                    <div className="col-span-2">
+                      {bizInProgressDeliverables > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-400">
+                          <PackageCheck size={13} />{bizInProgressDeliverables} in progress
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
+                    </div>
+
+                    {/* Health + arrow */}
+                    <div className="col-span-2 flex items-center justify-end gap-2">
+                      <CircleDot size={14} className={healthColor} />
+                      <ArrowUpRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
         </div>
       )}
-      {/* Onboarding Modal */}
+
+      {/* ONBOARDING MODAL */}
       <AnimatePresence>
         {isOnboarding && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }} onClick={() => !isCreating && setIsOnboarding(false)} />
-            
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-              className="glass-panel" 
-              style={{ position: 'relative', width: '100%', maxWidth: '600px', padding: '40px', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--surface-border)' }}
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-md"
+              onClick={() => !isCreating && setIsOnboarding(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 16 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full max-w-lg bg-[#141416] border border-white/[0.08] rounded-2xl p-8 shadow-2xl"
             >
-              <button 
-                onClick={() => setIsOnboarding(false)} 
-                disabled={isCreating}
-                style={{ position: 'absolute', top: '24px', right: '24px', background: 'var(--surface-hover)', border: 'none', padding: '8px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-tertiary)' }}
+              <button
+                onClick={() => !isCreating && setIsOnboarding(false)}
+                className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.05] hover:bg-white/[0.08] transition-colors text-muted-foreground"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
 
-              <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px', letterSpacing: '-0.02em' }}>Onboard Client</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Launch a new client environment and provision services instantly.</p>
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-2">Onboard Client</h2>
+                <p className="text-sm text-muted-foreground">Create a new client environment and provision services instantly.</p>
               </div>
 
-              <form onSubmit={handleOnboard} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <form onSubmit={handleOnboard} className="flex flex-col gap-6">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Client / Company Name</label>
-                  <input 
+                  <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Client Name</label>
+                  <input
                     autoFocus
                     required
                     placeholder="e.g. Acme Corp"
                     value={newBizName}
                     onChange={e => setNewBizName(e.target.value)}
-                    style={{ width: '100%', padding: '16px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', fontSize: '1rem', color: 'var(--text-primary)' }}
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/[0.08] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-white/20 text-sm transition-colors"
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Select Initial Services (Blueprints)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {blueprints.map((bp) => (
-                      <button
-                        key={bp.id}
-                        type="button"
-                        onClick={() => toggleBlueprint(bp.id)}
-                        style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '16px', borderRadius: '12px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s',
-                          background: selectedBlueprints.includes(bp.id) ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'var(--bg-primary)',
-                          border: selectedBlueprints.includes(bp.id) ? '1px solid var(--accent-primary)' : '1px solid var(--surface-border)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <LayoutTemplate size={16} color={selectedBlueprints.includes(bp.id) ? 'var(--accent-primary)' : 'var(--text-tertiary)'} />
-                          {selectedBlueprints.includes(bp.id) && <CheckCircle2 size={14} color="var(--accent-primary)" />}
-                        </div>
-                        <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: selectedBlueprints.includes(bp.id) ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{bp.name}</div>
-                      </button>
-                    ))}
+                {blueprints.length > 0 && (
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-3">Initial Services</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {blueprints.map((bp) => (
+                        <button
+                          key={bp.id}
+                          type="button"
+                          onClick={() => toggleBlueprint(bp.id)}
+                          className={`flex items-center gap-3 p-3 rounded-xl text-left text-sm transition-all border ${
+                            selectedBlueprints.includes(bp.id)
+                              ? 'bg-primary/10 border-primary/30 text-foreground'
+                              : 'bg-white/[0.03] border-white/[0.06] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground'
+                          }`}
+                        >
+                          <LayoutTemplate size={14} className={selectedBlueprints.includes(bp.id) ? 'text-primary' : ''} />
+                          <span className="flex-1 truncate font-medium">{bp.name}</span>
+                          {selectedBlueprints.includes(bp.id) && <CheckCircle2 size={14} className="text-primary shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <button 
-                  type="submit" 
-                  disabled={isCreating || !newBizName.trim()} 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', padding: '16px', fontSize: '1rem', fontWeight: 700, borderRadius: '12px', marginTop: '12px' }}
+                <button
+                  type="submit"
+                  disabled={isCreating || !newBizName.trim()}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors mt-2"
                 >
                   {isCreating ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" /> Provisioning Environment...
-                    </>
-                  ) : (
-                    'Provision & Launch Client Basecamp'
-                  )}
+                    <><Loader2 size={16} className="animate-spin" /> Provisioning…</>
+                  ) : 'Launch Client Environment'}
                 </button>
               </form>
             </motion.div>

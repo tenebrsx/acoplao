@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
   X, StickyNote, ListChecks, ClipboardList, Plus, Pin, PinOff,
@@ -27,6 +28,7 @@ const noteColors: Record<string, string> = {
 }
 
 export function ProductivityPanel() {
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('notes')
   const [notes, setNotes] = useState<Note[]>([])
@@ -145,13 +147,15 @@ export function ProductivityPanel() {
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
-        title="Productivity Panel (Cmd+Shift+P)"
-      >
-        <ListChecks size={20} />
-      </button>
+      {pathname !== '/tasks' && pathname !== '/notes' && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+          title="Productivity Panel (Cmd+Shift+P)"
+        >
+          <ListChecks size={20} />
+        </button>
+      )}
 
       <AnimatePresence>
         {isOpen && (
