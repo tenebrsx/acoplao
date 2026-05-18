@@ -212,7 +212,7 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                 <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-4 pl-1">Pinned Notes</h2>
                 <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
                   {pinnedNotes.map(note => (
-                    <button
+                    <div
                       key={note.id}
                       onClick={() => setSelectedNoteId(note.id)}
                       draggable
@@ -225,9 +225,18 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                           : 'border-white/5 bg-card hover:bg-white/[0.02] hover:border-primary/20 hover:scale-[1.02]'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2 w-full">
-                        <h3 className="font-semibold text-sm text-foreground/90 line-clamp-1">{note.title || 'Untitled Note'}</h3>
-                        <Pin size={12} className="text-primary shrink-0 mt-0.5" />
+                      <div className="flex items-start justify-between gap-2 mb-2 w-full relative">
+                        <h3 className="font-semibold text-sm text-foreground/90 pr-6 line-clamp-1">{note.title || 'Untitled Note'}</h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            togglePin(note.id)
+                          }}
+                          className="absolute right-0 top-0 h-6 w-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 text-primary cursor-pointer"
+                          title="Unpin Note"
+                        >
+                          <Pin size={12} className="fill-primary" />
+                        </button>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-4 mb-5 leading-relaxed">
                         {note.plain_text || <span className="italic opacity-30">No content...</span>}
@@ -243,7 +252,7 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                           </span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -254,7 +263,7 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                 {pinnedNotes.length > 0 && <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-4 pl-1 mt-6">Recent Notes</h2>}
                 <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
                   {recentNotes.map(note => (
-                    <button
+                    <div
                       key={note.id}
                       onClick={() => setSelectedNoteId(note.id)}
                       draggable
@@ -267,8 +276,18 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                           : 'border-white/5 bg-card hover:bg-white/[0.02] hover:border-primary/20 hover:scale-[1.02]'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2 w-full">
-                        <h3 className="font-semibold text-sm text-foreground/90 line-clamp-1">{note.title || 'Untitled Note'}</h3>
+                      <div className="flex items-start justify-between gap-2 mb-2 w-full relative">
+                        <h3 className="font-semibold text-sm text-foreground/90 pr-6 line-clamp-1">{note.title || 'Untitled Note'}</h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            togglePin(note.id)
+                          }}
+                          className="absolute right-0 top-0 h-6 w-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground cursor-pointer"
+                          title="Pin Note"
+                        >
+                          <Pin size={12} />
+                        </button>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-4 mb-5 leading-relaxed">
                         {note.plain_text || <span className="italic opacity-30">No content...</span>}
@@ -284,7 +303,7 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                           </span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
