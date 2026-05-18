@@ -107,10 +107,13 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
     },
   })
 
-  // Update content when prop changes
+  // Update content when prop changes externally (only when not focused to avoid cursor jumping and letter deletion)
   useEffect(() => {
-    if (editor && content && JSON.stringify(editor.getJSON()) !== JSON.stringify(content)) {
-      editor.commands.setContent(content)
+    if (editor && content) {
+      const isSameContent = JSON.stringify(editor.getJSON()) === JSON.stringify(content)
+      if (!isSameContent && !editor.isFocused) {
+        editor.commands.setContent(content)
+      }
     }
   }, [content, editor])
 
