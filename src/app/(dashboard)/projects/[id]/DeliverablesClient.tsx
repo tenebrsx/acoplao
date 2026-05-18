@@ -281,7 +281,7 @@ export function DeliverablesClient({
   const deleteDeliverable = async (id: string) => {
     if (!confirm('Are you sure you want to delete this content piece?')) return
     setDeliverables(prev => prev.filter(d => d.id !== id))
-    await supabase.from('deliverables').delete().eq('id', id)
+    await supabase.from('deliverables').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id)
     if (selectedAssetId === id) setSelectedAssetId(null)
     router.refresh()
   }

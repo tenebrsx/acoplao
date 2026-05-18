@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, Context } from 'react'
 
 type Theme = 'dark' | 'light' | 'system'
 
@@ -16,7 +16,14 @@ interface ThemeProviderState {
   resolvedTheme: 'dark' | 'light'
 }
 
-const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined)
+// Prevent HMR from re-creating the context object during hot reloads
+const ThemeProviderContext = (typeof window !== 'undefined' && (window as any).__themeContext
+  ? (window as any).__themeContext
+  : (() => {
+      const ctx = createContext<ThemeProviderState | undefined>(undefined)
+      if (typeof window !== 'undefined') (window as any).__themeContext = ctx
+      return ctx
+    })()) as Context<ThemeProviderState | undefined>
 
 export function ThemeProvider({
   children,

@@ -51,7 +51,7 @@ export function InvoiceListClient({ initialInvoices }: { initialInvoices: Invoic
   const handleDelete = useCallback(async (invoiceId: string) => {
     setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
     setOpenMenu(null)
-    const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+    const { error } = await supabase.from('invoices').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', invoiceId)
     if (error) {
       setInvoices(initialInvoices)
       toast('Failed to delete invoice', 'error')

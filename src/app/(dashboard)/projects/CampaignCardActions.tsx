@@ -22,7 +22,7 @@ export function CampaignCardActions({ projectId, projectTitle }: { projectId: st
     }
 
     setIsDeleting(true)
-    const { error } = await supabase.from('projects').delete().eq('id', projectId)
+    const { error } = await supabase.from('projects').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', projectId)
     
     if (error) {
       alert(`Error deleting campaign: ${error.message}`)

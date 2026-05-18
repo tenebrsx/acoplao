@@ -2,9 +2,9 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifySessionCookie } from '@/lib/firebase-admin'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { ProjectsDashboardClient } from './ProjectsDashboardClient'
+import { DeliverablesDashboardClient } from './DeliverablesDashboardClient'
 
-export default async function ProjectsPage() {
+export default async function DeliverablesDashboardPage() {
   const cookieStore = await cookies()
   const sessionToken = cookieStore.get('firebase-session')?.value
   if (!sessionToken) redirect('/login')
@@ -19,22 +19,30 @@ export default async function ProjectsPage() {
     .select('role')
     .eq('email', decoded.email)
     .single()
+  
   const role = profile?.role || 'admin'
+  if (role === 'client') redirect('/') // Clients shouldn't see global deliverables tab
 
-  const [businessesRes, projectsRes, blueprintsRes] = await Promise.all([
+  // Parallel data fetching for businesses, projects, and deliverables
+  const [businessesRes, projectsRes, deliverablesRes] = await Promise.all([
     supabase.from('businesses').select('id, name').neq('is_deleted', true).order('name'),
-    supabase.from('projects').select('*, businesses(name), deliverables(id, status_v2), project_phases(id, is_completed)').neq('is_deleted', true).order('created_at', { ascending: false }),
-    supabase.from('campaign_blueprints').select('*, blueprint_deliverables(*)').order('name'),
+    supabase.from('projects').select('id, title, business_id').neq('is_deleted', true).order('title'),
+    supabase.from('deliverables').select(`
+      *,
+      projects (
+        id, title, business_id,
+        businesses (id, name)
+      )
+    `).neq('is_deleted', true).order('created_at', { ascending: false }),
   ])
 
   return (
     <div className="animate-in delay-100">
-      <ProjectsDashboardClient 
-        initialProjects={projectsRes.data || []} 
+      <DeliverablesDashboardClient 
+        initialDeliverables={deliverablesRes.data || []} 
         businesses={businessesRes.data || []} 
-        role={role} 
-        favoriteIds={[]}
-        blueprints={blueprintsRes.data || []}
+        projects={projectsRes.data || []}
+        role={role}
       />
     </div>
   )

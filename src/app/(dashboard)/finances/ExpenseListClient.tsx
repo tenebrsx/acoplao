@@ -57,7 +57,7 @@ export function ExpenseListClient({ initialExpenses }: ExpenseListClientProps) {
     const previousExpenses = expenses
     setExpenses(prev => prev.filter(exp => exp.id !== expenseId))
     
-    const { error } = await supabase.from('expenses').delete().eq('id', expenseId)
+    const { error } = await supabase.from('expenses').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', expenseId)
     
     if (error) {
       setExpenses(previousExpenses)

@@ -116,7 +116,11 @@ export function CapacityGanttClient({ team, activeDeliverables }: { team: any[],
         <div style={{ display: 'flex', gap: '12px' }}>
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-            <input placeholder="Filter users..." style={{ padding: '8px 12px 8px 32px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', borderRadius: '8px', fontSize: '0.8125rem', color: 'white', outline: 'none' }} />
+            <input 
+              suppressHydrationWarning={true}
+              placeholder="Filter users..." 
+              style={{ padding: '8px 12px 8px 32px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', borderRadius: '8px', fontSize: '0.8125rem', color: 'white', outline: 'none' }} 
+            />
           </div>
           <button style={{ padding: '8px', background: 'var(--bg-primary)', border: '1px solid var(--surface-border)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <Filter size={16} />

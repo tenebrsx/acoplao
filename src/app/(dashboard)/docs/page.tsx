@@ -9,6 +9,7 @@ export default async function DocsDashboard() {
   const { data: allDocs } = await supabase
     .from('documents')
     .select('id, title, parent_id, icon, is_public, created_by, tags, updated_at, created_at')
+    .neq('is_deleted', true)
     .order('title', { ascending: true })
 
   if (allDocs && allDocs.length > 0) {

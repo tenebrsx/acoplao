@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Plus, Search, Pin, Trash2, FileText, ArrowUpRight,
-  Clock, X, MoreHorizontal
+  Plus, Search, Pin, Trash2, FileText, ArrowRight,
+  Clock, X, MoreHorizontal, Loader2
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ToastProvider'
@@ -30,12 +31,14 @@ type Note = {
 }
 
 export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; userId: string }) {
+  const router = useRouter()
   const [notes, setNotes] = useState<Note[]>(initialNotes)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
   const saveDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const { toast } = useToast()
@@ -161,12 +164,60 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
     await updateNote(noteId, { is_pinned: !note.is_pinned })
   }, [notes, updateNote])
 
+  const convertToDoc = useCallback(async (note: Note) => {
+    if (isConverting) return
+    setIsConverting(true)
+    
+    try {
+      // 1. Create a new document in the 'documents' table
+      const { data: docData, error: insertError } = await supabase
+        .from('documents')
+        .insert({
+          title: note.title || 'Converted Note',
+          content: note.content || { type: 'doc', content: [{ type: 'paragraph' }] },
+          created_by: userId,
+        })
+        .select('id')
+        .single()
+
+      if (insertError || !docData) {
+        console.error("Failed to insert document:", insertError)
+        toast('Failed to convert note to document', 'error')
+        setIsConverting(false)
+        return
+      }
+
+      // 2. Delete the note from the 'upnote_notes' table
+      const { error: deleteError } = await supabase
+        .from('upnote_notes')
+        .delete()
+        .eq('id', note.id)
+
+      if (deleteError) {
+        console.error("Failed to delete note after conversion:", deleteError)
+      }
+
+      // 3. Remove the note from our local state
+      setNotes(prev => prev.filter(n => n.id !== note.id))
+      setSelectedNoteId(null)
+      toast('Note successfully converted to Document!', 'success')
+      
+      // 4. Redirect the user to the newly created document page
+      router.push(`/docs/${docData.id}`)
+    } catch (err) {
+      console.error("Error during conversion:", err)
+      toast('An unexpected error occurred during conversion', 'error')
+    } finally {
+      setIsConverting(false)
+    }
+  }, [isConverting, userId, supabase, toast, router])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Notes</h1>
-          <p className="text-sm text-muted-foreground mt-1">Quick notes and thoughts. For full knowledge management, use <Link href="/upnotes" className="text-primary hover:underline">UpNotes</Link>.</p>
+          <p className="text-sm text-muted-foreground mt-1">Quick notes and thoughts. Convert to Docs when you're ready to organize them.</p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => setIsCreating(true)}>
           <Plus size={14} /> New Note
@@ -372,9 +423,21 @@ export function NotesClient({ initialNotes, userId }: { initialNotes: Note[]; us
                   <span>{selectedNote.word_count} words</span>
                   <span>Edited {format(new Date(selectedNote.updated_at), 'MMM d, h:mm a')}</span>
                 </div>
-                <Link href="/upnotes" className="text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
-                  Open in UpNotes <ArrowUpRight size={12} />
-                </Link>
+                <button
+                  onClick={() => convertToDoc(selectedNote)}
+                  disabled={isConverting}
+                  className="text-primary hover:text-primary/80 transition-colors flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isConverting ? (
+                    <>
+                      Converting <Loader2 size={12} className="animate-spin" />
+                    </>
+                  ) : (
+                    <>
+                      Convert to Docs <ArrowRight size={12} />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}

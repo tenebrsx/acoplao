@@ -9,7 +9,7 @@ import {
   LogOut, Sparkles, Bell, Search, FileText, PanelLeftClose,
   PanelLeftOpen, Calendar, BarChart, HardDrive, Plus, Wallet,
   Settings, ChevronDown, ClipboardList, StickyNote, ListChecks,
-  BookOpen, Sun, Moon,
+  BookOpen, Sun, Moon, Package
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useTheme } from './ThemeProvider'
@@ -35,7 +35,8 @@ function getNavSections(role: string): NavSection[] {
   if (role === 'admin' || role === 'manager') {
     work.push(
       { name: 'Clients', href: '/businesses', icon: Building2 },
-      { name: 'Projects', href: '/projects', icon: FolderKanban }
+      { name: 'Projects', href: '/projects', icon: FolderKanban },
+      { name: 'Deliverables', href: '/deliverables', icon: Package }
     )
     content.push(
       { name: 'Global Drive', href: '/drive', icon: HardDrive },
@@ -53,11 +54,11 @@ function getNavSections(role: string): NavSection[] {
       { name: 'Tasks', href: '/tasks', icon: ListChecks },
       { name: 'Lists', href: '/lists', icon: ClipboardList },
       { name: 'Notes', href: '/notes', icon: StickyNote },
-      { name: 'UpNotes', href: '/upnotes', icon: BookOpen },
     )
   } else if (role === 'contractor') {
     work.push(
-      { name: 'My Projects', href: '/projects', icon: FolderKanban }
+      { name: 'My Projects', href: '/projects', icon: FolderKanban },
+      { name: 'Deliverables', href: '/deliverables', icon: Package }
     )
     content.push(
       { name: 'Calendar', href: '/calendar', icon: Calendar },
@@ -68,7 +69,6 @@ function getNavSections(role: string): NavSection[] {
       { name: 'Tasks', href: '/tasks', icon: ListChecks },
       { name: 'Lists', href: '/lists', icon: ClipboardList },
       { name: 'Notes', href: '/notes', icon: StickyNote },
-      { name: 'UpNotes', href: '/upnotes', icon: BookOpen },
     )
   } else if (role === 'client') {
     work.push({ name: 'Projects', href: '/projects', icon: FolderKanban })

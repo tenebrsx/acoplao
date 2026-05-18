@@ -36,7 +36,7 @@ export function DocActions({ doc }: { doc: any }) {
     setIsDeleting(true)
     const { error } = await supabase
       .from('documents')
-      .delete()
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
       .eq('id', doc.id)
 
     if (error) {
