@@ -150,6 +150,17 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
     </button>
   )
 
+  const FloatingToolbarButton = ({ onClick, active, children, title }: { onClick: () => void, active?: boolean, children: React.ReactNode, title?: string }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`floating-toolbar-btn${active ? ' active' : ''}`}
+    >
+      {children}
+    </button>
+  )
+
   return (
     <div className="tiptap-wrapper">
       <EditorContent editor={editor} />
@@ -179,6 +190,47 @@ export function TiptapEditor({ content, onUpdate, editable = true }: TiptapEdito
             </ToolbarButton>
           </div>
         </BubbleMenu>
+      )}
+
+      {editable && editor && (
+        <div className="editor-floating-toolbar">
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Heading 1">
+            <Heading1 size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading 2">
+            <Heading2 size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading 3">
+            <Heading3 size={14} />
+          </FloatingToolbarButton>
+
+          <div className="w-px h-4 bg-white/10 mx-1 self-center"></div>
+
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet List">
+            <List size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Ordered List">
+            <ListOrdered size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Task List">
+            <CheckSquare size={14} />
+          </FloatingToolbarButton>
+
+          <div className="w-px h-4 bg-white/10 mx-1 self-center"></div>
+
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">
+            <Quote size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code Block">
+            <Code size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={addTable} active={editor.isActive('table')} title="Insert Table">
+            <TableIcon size={14} />
+          </FloatingToolbarButton>
+          <FloatingToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider">
+            <Minus size={14} />
+          </FloatingToolbarButton>
+        </div>
       )}
     </div>
   )

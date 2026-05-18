@@ -554,3 +554,54 @@
     font-size: 1.125rem;
   }
 }
+
+/* Floating Glassmorphic Bottom Toolbar Styles */
+.editor-floating-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(23, 23, 24, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.6);
+  width: fit-content;
+  margin: 32px auto 8px auto;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.editor-floating-toolbar:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(23, 23, 24, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 48px -8px rgba(0, 0, 0, 0.7);
+}
+
+.floating-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+  transform: scale(1.05);
+}
+
+.floating-toolbar-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #10b981; /* Brand green */
+}
+
