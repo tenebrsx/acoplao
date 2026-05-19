@@ -20,9 +20,13 @@ export async function POST(request: Request) {
       maxAge: expiresIn / 1000, // maxAge is in seconds
     })
     return response
-  } catch (err) {
-    console.error('[session] POST error:', err)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  } catch (err: any) {
+    console.error('[session] POST error:', err?.message || err)
+    console.error('[session] Stack:', err?.stack)
+    console.error('[session] ADMIN_PROJECT_ID present:', !!process.env.ADMIN_PROJECT_ID)
+    console.error('[session] ADMIN_CLIENT_EMAIL present:', !!process.env.ADMIN_CLIENT_EMAIL)
+    console.error('[session] ADMIN_PRIVATE_KEY present:', !!process.env.ADMIN_PRIVATE_KEY)
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 })
   }
 }
 

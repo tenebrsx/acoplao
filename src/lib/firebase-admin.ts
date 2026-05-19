@@ -9,13 +9,13 @@ function getAdminApp(): App {
     if (getApps().length > 0) {
       adminApp = getApps()[0]
     } else {
-      const projectId = process.env.FIREBASE_PROJECT_ID
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+      const projectId = process.env.ADMIN_PROJECT_ID
+      const clientEmail = process.env.ADMIN_CLIENT_EMAIL
+      const privateKey = process.env.ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n')
 
       if (!projectId || !clientEmail || !privateKey) {
         throw new Error(
-          'Firebase Admin env vars missing. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.'
+          'Firebase Admin env vars missing. Set ADMIN_PROJECT_ID, ADMIN_CLIENT_EMAIL, ADMIN_PRIVATE_KEY.'
         )
       }
 
